@@ -16,19 +16,19 @@ export function NodeMarker({ nodeId, position, label, isExplored, isOnPath }) {
         }
     });
 
-    let color = '#2a3555';
-    let emissive = '#2a3555';
+    let color = '#aabcc4';
+    let emissive = '#1a2035';
     let emissiveIntensity = 0;
     let size = 0.2;
 
     if (isOnPath) {
-        color = '#00ff85';
-        emissive = '#00ff85';
+        color = '#2ecc71';
+        emissive = '#27ae60';
         emissiveIntensity = 1;
         size = 0.28;
     } else if (isExplored) {
-        color = '#ff7a2b';
-        emissive = '#ff7a2b';
+        color = '#3a7dc8';
+        emissive = '#2e6bb3';
         emissiveIntensity = 0.7;
         size = 0.24;
     }
@@ -50,12 +50,13 @@ export function NodeMarker({ nodeId, position, label, isExplored, isOnPath }) {
                     distanceFactor={18}
                     style={{
                         fontSize: '9px',
-                        color: isOnPath ? '#00ff85' : '#8892b0',
-                        background: 'rgba(10,12,19,0.7)',
+                        color: isOnPath ? '#2ecc71' : isExplored ? '#3a7dc8' : '#8892b0',
+                        background: 'rgba(255,255,255,0.9)',
                         padding: '1px 4px',
                         borderRadius: '3px',
                         whiteSpace: 'nowrap',
                         pointerEvents: 'none',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                     }}
                     position={[0, 0.6, 0]}
                 >

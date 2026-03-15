@@ -1,20 +1,23 @@
 /**
- * DecisionTree — visualizes algorithm exploration with a clean light-theme
+ * DecisionTree — visualizes algorithm exploration with an expandable
  * React Flow diagram and a readable step log.
+ * Colors:
+ * - Green (#2ecc71): On Optimal Path
+ * - Blue/Mint (#3a7dc8): Explored (visited, queued, or settled by algo)
  */
 import ReactFlow, { Background, Controls } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import useStore from '../../store/useStore';
 import { NODES } from '../../data/townGraph';
 
-function buildFlowGraph(stepsResult) {
+function buildFlowGraph(stepsResult, isExpanded = false) {
     if (!stepsResult?.steps?.length) return { nodes: [], edges: [] };
-    const steps = stepsResult.steps.slice(0, 28);
+    const steps = stepsResult.steps.slice(0, isExpanded ? 80 : 28);
     const seen = new Map();
     const rfNodes = [];
     const rfEdges = [];
-    const COLS = 5;
+    const COLS = isExpanded ? 8 : 5;
     const COL_W = 160, ROW_H = 110;
 
     steps.forEach((step, i) => {
@@ -43,11 +46,11 @@ function buildFlowGraph(stepsResult) {
                 },
                 style: {
                     background: isOnPath ? '#eafaf1' : '#f4f7fc',
-                    border: `1.5px solid ${isOnPath ? '#2ecc71' : '#c8d4e8'}`,
+                    border: `2px solid ${isOnPath ? '#2ecc71' : '#3a7dc8'}`, // Green for path, Blue for explored
                     borderRadius: 9,
                     minWidth: 120,
                     padding: '5px 3px',
-                    boxShadow: isOnPath ? '0 2px 10px rgba(46,204,113,0.25)' : '0 1px 4px rgba(0,0,0,0.1)',
+                    boxShadow: isOnPath ? '0 2px 10px rgba(46,204,113,0.35)' : '0 1px 4px rgba(58,125,200,0.15)',
                 },
             });
         }
@@ -60,8 +63,8 @@ function buildFlowGraph(stepsResult) {
                 source: nid,
                 target: nb.node,
                 label: nb.new_dist != null ? String(Number(nb.new_dist).toFixed(1)) : '',
-                style: { stroke: isPathEdge ? '#2ecc71' : '#b0bcd4', strokeWidth: isPathEdge ? 2 : 1 },
-                labelStyle: { fill: '#5a7090', fontSize: 8, fontFamily: 'monospace' },
+                style: { stroke: isPathEdge ? '#2ecc71' : '#9bb0cc', strokeWidth: isPathEdge ? 2 : 1.5 },
+                labelStyle: { fill: '#4a5a70', fontSize: 8, fontFamily: 'monospace' },
                 type: 'smoothstep',
                 animated: isPathEdge,
             });
@@ -73,7 +76,9 @@ function buildFlowGraph(stepsResult) {
 
 export function DecisionTree() {
     const { stepsResult, algorithm } = useStore();
-    const { nodes, edges } = useMemo(() => buildFlowGraph(stepsResult), [stepsResult]);
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const { nodes, edges } = useMemo(() => buildFlowGraph(stepsResult, isExpanded), [stepsResult, isExpanded]);
 
     if (!stepsResult) {
         return (
@@ -88,23 +93,36 @@ export function DecisionTree() {
 
     const algoLabel = { dijkstra: "Dijkstra", astar: "A*", bellman_ford: "Bellman-Ford" }[algorithm];
 
+    const Legend = () => (
+        <div style={{ display: 'flex', gap: 12, fontSize: '10px', color: 'var(--text-secondary)' }}>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#eafaf1', border: '2px solid #2ecc71', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />On path</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#f4f7fc', border: '2px solid #3a7dc8', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />Explored</span>
+            <span style={{ color: '#889aae', fontStyle: 'italic' }}>* Unvisited nodes hidden</span>
+        </div>
+    );
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-blue)', textTransform: 'uppercase', letterSpacing: '0.8px', margin: 0 }}>
-                    {algoLabel} Search Tree
-                </p>
-                <span className="badge badge-blue">{stepsResult.steps?.length} steps</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-blue)', textTransform: 'uppercase', letterSpacing: '0.8px', margin: 0 }}>
+                        {algoLabel} Tree
+                    </p>
+                    <span className="badge badge-blue">{stepsResult.steps?.length} steps</span>
+                </div>
+                <button
+                    onClick={() => setIsExpanded(true)}
+                    className="btn btn-ghost"
+                    style={{ padding: '4px 8px', fontSize: '10px' }}
+                >
+                    ⛶ Expand
+                </button>
             </div>
 
-            {/* Legend */}
-            <div style={{ display: 'flex', gap: 12, fontSize: '10px', color: 'var(--text-secondary)' }}>
-                <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#eafaf1', border: '1.5px solid #2ecc71', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />On path</span>
-                <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#f4f7fc', border: '1.5px solid #c8d4e8', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />Explored</span>
-            </div>
+            <Legend />
 
-            {/* Diagram */}
-            <div style={{ height: '300px', background: '#f8fafc', borderRadius: 10, border: '1px solid #dde5f0', overflow: 'hidden' }}>
+            {/* Small inline Diagram */}
+            <div style={{ height: '240px', background: '#f8fafc', borderRadius: 10, border: '1px solid #dde5f0', overflow: 'hidden', position: 'relative' }}>
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}
@@ -118,12 +136,11 @@ export function DecisionTree() {
                     maxZoom={2}
                 >
                     <Background color="#dde5f0" gap={22} size={1} />
-                    <Controls showInteractive={false} style={{ background: '#fff', border: '1px solid #dde5f0', borderRadius: 7 }} />
                 </ReactFlow>
             </div>
 
             {/* Step log */}
-            <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {stepsResult.steps?.slice(0, 20).map((step) => (
                     <div key={step.step} style={{
                         fontSize: '11px', fontFamily: 'var(--font-mono)',
@@ -135,6 +152,52 @@ export function DecisionTree() {
                     </div>
                 ))}
             </div>
+
+            {/* Expanded Modal Overlay */}
+            {isExpanded && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 9999,
+                    background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '24px'
+                }}>
+                    <div style={{
+                        width: '100%', maxWidth: '1200px', height: '90vh',
+                        background: '#f8fafc', borderRadius: 16,
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                        display: 'flex', flexDirection: 'column', overflow: 'hidden'
+                    }}>
+                        <div style={{ padding: '16px 24px', borderBottom: '1px solid #dde5f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                                <h2 style={{ margin: 0, fontSize: '18px', color: '#1a2a3a' }}>{algoLabel} Search Tree Detail</h2>
+                                <Legend />
+                            </div>
+                            <button
+                                onClick={() => setIsExpanded(false)}
+                                className="btn btn-danger"
+                                style={{ padding: '8px 16px' }}
+                            >
+                                ✕ Close
+                            </button>
+                        </div>
+                        <div style={{ flex: 1, position: 'relative' }}>
+                            <ReactFlow
+                                nodes={nodes}
+                                edges={edges}
+                                fitView
+                                fitViewOptions={{ padding: 0.1 }}
+                                proOptions={{ hideAttribution: true }}
+                                nodesDraggable={true}
+                                minZoom={0.1}
+                                maxZoom={3}
+                            >
+                                <Background color="#dde5f0" gap={30} size={1} />
+                                <Controls style={{ background: '#fff', border: '1px solid #dde5f0', borderRadius: 8, padding: 4 }} />
+                            </ReactFlow>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

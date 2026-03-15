@@ -1,33 +1,13 @@
 /**
- * VisualMap Town Graph — 7 blocks × 6 houses = 42 delivery addresses.
- *
- * Layout (top-down):
- *   Row 0: [Block A] [Block B] [Block C] [Block D]  (z ≈ -16)
- *   Row 1:       [Block E] [Block F] [Block G]       (z ≈ 10)
- *   Warehouse: far west
- *
- * One‑way roads:
- *   North perimeter (z=-25): W → E  (warehouse → east)
- *   East column (x=38):      N → S
- *   South perimeter (z=19):  E → W
- *   West column (x=-30):     S → N  (completing the loop)
- *
- * Middle inter‑row road (z=-3): two‑way east/west
- * Vertical block driveways: two‑way
+ * townGraph.js — Frontend graph matching backend perfectly.
+ * 42 houses, with orthogonal driveways running down central alleyways.
  */
 
-// ------------------------------------------------------------------
-// NODES
-// ------------------------------------------------------------------
-// pos = [x, y, z]  (y=0 = ground level)
-// type: "warehouse" | "intersection" | "address"
-// For "address" nodes, 'block' and 'houseIndex' annotate which block/slot
-
 export const NODES = {
-    // ── Warehouse ─────────────────────────────────────────────────
+    // Warehouse
     warehouse: { label: "Warehouse", pos: [-34, 0, -16], type: "warehouse" },
 
-    // ── North perimeter road (one-way W→E, z=-25) ─────────────────
+    // North perimeter (one-way W→E, z=-25)
     n_wh: { label: "N-WH", pos: [-30, 0, -25], type: "intersection" },
     n_A: { label: "N-A", pos: [-18, 0, -25], type: "intersection" },
     n_AB: { label: "N-AB", pos: [-10, 0, -25], type: "intersection" },
@@ -38,7 +18,7 @@ export const NODES = {
     n_D: { label: "N-D", pos: [30, 0, -25], type: "intersection" },
     n_De: { label: "N-De", pos: [38, 0, -25], type: "intersection" },
 
-    // ── Middle road (two-way, z=-3) ────────────────────────────────
+    // Middle road (two-way, z=-3)
     m_w: { label: "M-W", pos: [-30, 0, -3], type: "intersection" },
     m_A: { label: "M-A", pos: [-18, 0, -3], type: "intersection" },
     m_AB: { label: "M-AB", pos: [-10, 0, -3], type: "intersection" },
@@ -49,7 +29,7 @@ export const NODES = {
     m_D: { label: "M-D", pos: [30, 0, -3], type: "intersection" },
     m_e: { label: "M-E", pos: [38, 0, -3], type: "intersection" },
 
-    // ── Row-1 north road (two-way, z=3) ───────────────────────────
+    // Row-1 north road (two-way, z=3)
     r1_w: { label: "R1-W", pos: [-30, 0, 3], type: "intersection" },
     r1_E: { label: "R1-E", pos: [-11, 0, 3], type: "intersection" },
     r1_EF: { label: "R1-EF", pos: [-4, 0, 3], type: "intersection" },
@@ -58,7 +38,7 @@ export const NODES = {
     r1_G: { label: "R1-G", pos: [17, 0, 3], type: "intersection" },
     r1_e: { label: "R1-GE", pos: [38, 0, 3], type: "intersection" },
 
-    // ── South perimeter road (one-way E→W, z=19) ──────────────────
+    // South perimeter (one-way E→W, z=19)
     s_e: { label: "S-E", pos: [38, 0, 19], type: "intersection" },
     s_G: { label: "S-G", pos: [17, 0, 19], type: "intersection" },
     s_FG: { label: "S-FG", pos: [10, 0, 19], type: "intersection" },
@@ -67,196 +47,167 @@ export const NODES = {
     s_E: { label: "S-E2", pos: [-11, 0, 19], type: "intersection" },
     s_w: { label: "S-W", pos: [-30, 0, 19], type: "intersection" },
 
-    // ── West column (one-way S→N, x=-30) ──────────────────────────
-    // connects s_w → r1_w → m_w → n_wh (already defined above)
+    // ---- Block A Driveways ----
+    drv_A1: { label: "", pos: [-18, 0, -20], type: "intersection" },
+    drv_A2: { label: "", pos: [-18, 0, -14], type: "intersection" },
+    drv_A3: { label: "", pos: [-18, 0, -8], type: "intersection" },
+    a1: { label: "12 Apple St", pos: [-23, 0, -20], type: "address", block: 'A' },
+    a4: { label: "18 Apple St", pos: [-13, 0, -20], type: "address", block: 'A' },
+    a2: { label: "14 Apple St", pos: [-23, 0, -14], type: "address", block: 'A' },
+    a5: { label: "20 Apple St", pos: [-13, 0, -14], type: "address", block: 'A' },
+    a3: { label: "16 Apple St", pos: [-23, 0, -8], type: "address", block: 'A' },
+    a6: { label: "22 Apple St", pos: [-13, 0, -8], type: "address", block: 'A' },
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // DELIVERY ADDRESSES — 7 blocks × 6 houses
-    // Houses sit INSIDE each block (off-road)
-    // Block extents (x: cx±7, z: cz±5)
-    // House grid: 3 cols (cx-4, cx, cx+4), 2 rows (cz-3, cz+2.5)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ---- Block B Driveways ----
+    drv_B1: { label: "", pos: [-2, 0, -20], type: "intersection" },
+    drv_B2: { label: "", pos: [-2, 0, -14], type: "intersection" },
+    drv_B3: { label: "", pos: [-2, 0, -8], type: "intersection" },
+    b1: { label: "5 Baker Ave", pos: [-7, 0, -20], type: "address", block: 'B' },
+    b4: { label: "11 Baker Ave", pos: [3, 0, -20], type: "address", block: 'B' },
+    b2: { label: "7 Baker Ave", pos: [-7, 0, -14], type: "address", block: 'B' },
+    b5: { label: "13 Baker Ave", pos: [3, 0, -14], type: "address", block: 'B' },
+    b3: { label: "9 Baker Ave", pos: [-7, 0, -8], type: "address", block: 'B' },
+    b6: { label: "15 Baker Ave", pos: [3, 0, -8], type: "address", block: 'B' },
 
-    // Block A — center (-18, -16) ──────────────────────────────────
-    a1: { label: "12 Apple St", pos: [-22, 0, -19], type: "address", block: "A" },
-    a2: { label: "14 Apple St", pos: [-18, 0, -19], type: "address", block: "A" },
-    a3: { label: "16 Apple St", pos: [-14, 0, -19], type: "address", block: "A" },
-    a4: { label: "18 Apple St", pos: [-22, 0, -13], type: "address", block: "A" },
-    a5: { label: "20 Apple St", pos: [-18, 0, -13], type: "address", block: "A" },
-    a6: { label: "22 Apple St", pos: [-14, 0, -13], type: "address", block: "A" },
+    // ---- Block C Driveways ----
+    drv_C1: { label: "", pos: [14, 0, -20], type: "intersection" },
+    drv_C2: { label: "", pos: [14, 0, -14], type: "intersection" },
+    drv_C3: { label: "", pos: [14, 0, -8], type: "intersection" },
+    c1: { label: "3 Cedar Ln", pos: [9, 0, -20], type: "address", block: 'C' },
+    c4: { label: "9 Cedar Ln", pos: [19, 0, -20], type: "address", block: 'C' },
+    c2: { label: "5 Cedar Ln", pos: [9, 0, -14], type: "address", block: 'C' },
+    c5: { label: "11 Cedar Ln", pos: [19, 0, -14], type: "address", block: 'C' },
+    c3: { label: "7 Cedar Ln", pos: [9, 0, -8], type: "address", block: 'C' },
+    c6: { label: "13 Cedar Ln", pos: [19, 0, -8], type: "address", block: 'C' },
 
-    // Block B — center (-2, -16) ───────────────────────────────────
-    b1: { label: "5 Baker Ave", pos: [-6, 0, -19], type: "address", block: "B" },
-    b2: { label: "7 Baker Ave", pos: [-2, 0, -19], type: "address", block: "B" },
-    b3: { label: "9 Baker Ave", pos: [2, 0, -19], type: "address", block: "B" },
-    b4: { label: "11 Baker Ave", pos: [-6, 0, -13], type: "address", block: "B" },
-    b5: { label: "13 Baker Ave", pos: [-2, 0, -13], type: "address", block: "B" },
-    b6: { label: "15 Baker Ave", pos: [2, 0, -13], type: "address", block: "B" },
+    // ---- Block D Driveways ----
+    drv_D1: { label: "", pos: [30, 0, -20], type: "intersection" },
+    drv_D2: { label: "", pos: [30, 0, -14], type: "intersection" },
+    drv_D3: { label: "", pos: [30, 0, -8], type: "intersection" },
+    d1: { label: "1 Daisy Rd", pos: [25, 0, -20], type: "address", block: 'D' },
+    d4: { label: "7 Daisy Rd", pos: [35, 0, -20], type: "address", block: 'D' },
+    d2: { label: "3 Daisy Rd", pos: [25, 0, -14], type: "address", block: 'D' },
+    d5: { label: "9 Daisy Rd", pos: [35, 0, -14], type: "address", block: 'D' },
+    d3: { label: "5 Daisy Rd", pos: [25, 0, -8], type: "address", block: 'D' },
+    d6: { label: "11 Daisy Rd", pos: [35, 0, -8], type: "address", block: 'D' },
 
-    // Block C — center (14, -16) ───────────────────────────────────
-    c1: { label: "3 Cedar Ln", pos: [10, 0, -19], type: "address", block: "C" },
-    c2: { label: "5 Cedar Ln", pos: [14, 0, -19], type: "address", block: "C" },
-    c3: { label: "7 Cedar Ln", pos: [18, 0, -19], type: "address", block: "C" },
-    c4: { label: "9 Cedar Ln", pos: [10, 0, -13], type: "address", block: "C" },
-    c5: { label: "11 Cedar Ln", pos: [14, 0, -13], type: "address", block: "C" },
-    c6: { label: "13 Cedar Ln", pos: [18, 0, -13], type: "address", block: "C" },
+    // ---- Block E Driveways ----
+    drv_E1: { label: "", pos: [-11, 0, 7], type: "intersection" },
+    drv_E2: { label: "", pos: [-11, 0, 11], type: "intersection" },
+    drv_E3: { label: "", pos: [-11, 0, 15], type: "intersection" },
+    e1: { label: "2 Elm Way", pos: [-16, 0, 7], type: "address", block: 'E' },
+    e4: { label: "8 Elm Way", pos: [-6, 0, 7], type: "address", block: 'E' },
+    e2: { label: "4 Elm Way", pos: [-16, 0, 11], type: "address", block: 'E' },
+    e5: { label: "10 Elm Way", pos: [-6, 0, 11], type: "address", block: 'E' },
+    e3: { label: "6 Elm Way", pos: [-16, 0, 15], type: "address", block: 'E' },
+    e6: { label: "12 Elm Way", pos: [-6, 0, 15], type: "address", block: 'E' },
 
-    // Block D — center (30, -16) ───────────────────────────────────
-    d1: { label: "1 Daisy Rd", pos: [26, 0, -19], type: "address", block: "D" },
-    d2: { label: "3 Daisy Rd", pos: [30, 0, -19], type: "address", block: "D" },
-    d3: { label: "5 Daisy Rd", pos: [34, 0, -19], type: "address", block: "D" },
-    d4: { label: "7 Daisy Rd", pos: [26, 0, -13], type: "address", block: "D" },
-    d5: { label: "9 Daisy Rd", pos: [30, 0, -13], type: "address", block: "D" },
-    d6: { label: "11 Daisy Rd", pos: [34, 0, -13], type: "address", block: "D" },
+    // ---- Block F Driveways ----
+    drv_F1: { label: "", pos: [3, 0, 7], type: "intersection" },
+    drv_F2: { label: "", pos: [3, 0, 11], type: "intersection" },
+    drv_F3: { label: "", pos: [3, 0, 15], type: "intersection" },
+    f1: { label: "1 Fig Blvd", pos: [-2, 0, 7], type: "address", block: 'F' },
+    f4: { label: "7 Fig Blvd", pos: [8, 0, 7], type: "address", block: 'F' },
+    f2: { label: "3 Fig Blvd", pos: [-2, 0, 11], type: "address", block: 'F' },
+    f5: { label: "9 Fig Blvd", pos: [8, 0, 11], type: "address", block: 'F' },
+    f3: { label: "5 Fig Blvd", pos: [-2, 0, 15], type: "address", block: 'F' },
+    f6: { label: "11 Fig Blvd", pos: [8, 0, 15], type: "address", block: 'F' },
 
-    // Block E — center (-11, 10) ──────────────────────────────────
-    e1: { label: "2 Elm Way", pos: [-15, 0, 7], type: "address", block: "E" },
-    e2: { label: "4 Elm Way", pos: [-11, 0, 7], type: "address", block: "E" },
-    e3: { label: "6 Elm Way", pos: [-7, 0, 7], type: "address", block: "E" },
-    e4: { label: "8 Elm Way", pos: [-15, 0, 13], type: "address", block: "E" },
-    e5: { label: "10 Elm Way", pos: [-11, 0, 13], type: "address", block: "E" },
-    e6: { label: "12 Elm Way", pos: [-7, 0, 13], type: "address", block: "E" },
-
-    // Block F — center (3, 10) ────────────────────────────────────
-    f1: { label: "1 Fig Blvd", pos: [-1, 0, 7], type: "address", block: "F" },
-    f2: { label: "3 Fig Blvd", pos: [3, 0, 7], type: "address", block: "F" },
-    f3: { label: "5 Fig Blvd", pos: [7, 0, 7], type: "address", block: "F" },
-    f4: { label: "7 Fig Blvd", pos: [-1, 0, 13], type: "address", block: "F" },
-    f5: { label: "9 Fig Blvd", pos: [3, 0, 13], type: "address", block: "F" },
-    f6: { label: "11 Fig Blvd", pos: [7, 0, 13], type: "address", block: "F" },
-
-    // Block G — center (17, 10) ───────────────────────────────────
-    g1: { label: "10 Grove Ct", pos: [13, 0, 7], type: "address", block: "G" },
-    g2: { label: "12 Grove Ct", pos: [17, 0, 7], type: "address", block: "G" },
-    g3: { label: "14 Grove Ct", pos: [21, 0, 7], type: "address", block: "G" },
-    g4: { label: "16 Grove Ct", pos: [13, 0, 13], type: "address", block: "G" },
-    g5: { label: "18 Grove Ct", pos: [17, 0, 13], type: "address", block: "G" },
-    g6: { label: "20 Grove Ct", pos: [21, 0, 13], type: "address", block: "G" },
+    // ---- Block G Driveways ----
+    drv_G1: { label: "", pos: [17, 0, 7], type: "intersection" },
+    drv_G2: { label: "", pos: [17, 0, 11], type: "intersection" },
+    drv_G3: { label: "", pos: [17, 0, 15], type: "intersection" },
+    g1: { label: "10 Grove Ct", pos: [12, 0, 7], type: "address", block: 'G' },
+    g4: { label: "16 Grove Ct", pos: [22, 0, 7], type: "address", block: 'G' },
+    g2: { label: "12 Grove Ct", pos: [12, 0, 11], type: "address", block: 'G' },
+    g5: { label: "18 Grove Ct", pos: [22, 0, 11], type: "address", block: 'G' },
+    g3: { label: "14 Grove Ct", pos: [12, 0, 15], type: "address", block: 'G' },
+    g6: { label: "20 Grove Ct", pos: [22, 0, 15], type: "address", block: 'G' },
 };
 
-// ------------------------------------------------------------------
-// EDGES  [from, to, oneWay?]
-// oneWay=true  → only adds from→to in backend adjacency (directed)
-// oneWay=false → bidirectional
-// ------------------------------------------------------------------
+// Map object mapping for ease-of-use
+export const ADDRESS_NODES = Object.keys(NODES)
+    .filter(k => NODES[k].type === 'address')
+    .map(k => ({ id: k, ...NODES[k] }));
+
 export const EDGES = [
-    // ── Warehouse to north loop ────────────────────────────────────
+    // Warehouse
     ["warehouse", "n_wh", false],
 
-    // ── North perimeter road (ONE-WAY W→E) ────────────────────────
-    ["n_wh", "n_A", true],
-    ["n_A", "n_AB", true],
-    ["n_AB", "n_B", true],
-    ["n_B", "n_BC", true],
-    ["n_BC", "n_C", true],
-    ["n_C", "n_CD", true],
-    ["n_CD", "n_D", true],
-    ["n_D", "n_De", true],
+    // North perimeter ONE-WAY W→E
+    ["n_wh", "n_A", true], ["n_A", "n_AB", true], ["n_AB", "n_B", true],
+    ["n_B", "n_BC", true], ["n_BC", "n_C", true], ["n_C", "n_CD", true],
+    ["n_CD", "n_D", true], ["n_D", "n_De", true],
 
-    // ── East column (ONE-WAY N→S) ──────────────────────────────────
-    ["n_De", "m_e", true],
-    ["m_e", "r1_e", true],
-    ["r1_e", "s_e", true],
+    // East column ONE-WAY N→S
+    ["n_De", "m_e", true], ["m_e", "r1_e", true], ["r1_e", "s_e", true],
 
-    // ── South perimeter road (ONE-WAY E→W) ────────────────────────
-    ["s_e", "s_G", true],
-    ["s_G", "s_FG", true],
-    ["s_FG", "s_F", true],
-    ["s_F", "s_EF", true],
-    ["s_EF", "s_E", true],
-    ["s_E", "s_w", true],
+    // South perimeter ONE-WAY E→W
+    ["s_e", "s_G", true], ["s_G", "s_FG", true], ["s_FG", "s_F", true],
+    ["s_F", "s_EF", true], ["s_EF", "s_E", true], ["s_E", "s_w", true],
 
-    // ── West column (ONE-WAY S→N) ──────────────────────────────────
-    ["s_w", "r1_w", true],
-    ["r1_w", "m_w", true],
-    ["m_w", "n_wh", true],
+    // West column ONE-WAY S→N
+    ["s_w", "r1_w", true], ["r1_w", "m_w", true], ["m_w", "n_wh", true],
 
-    // ── Middle road vertical connectors (two-way) ──────────────────
-    ["n_A", "m_A", false],
-    ["n_AB", "m_AB", false],
-    ["n_B", "m_B", false],
-    ["n_BC", "m_BC", false],
-    ["n_C", "m_C", false],
-    ["n_CD", "m_CD", false],
-    ["n_D", "m_D", false],
+    // Middle horizontal two-way
+    ["m_w", "m_A", false], ["m_A", "m_AB", false], ["m_AB", "m_B", false],
+    ["m_B", "m_BC", false], ["m_BC", "m_C", false], ["m_C", "m_CD", false],
+    ["m_CD", "m_D", false], ["m_D", "m_e", false],
 
-    // ── Middle road horizontal (two-way) ──────────────────────────
-    ["m_w", "m_A", false],
-    ["m_A", "m_AB", false],
-    ["m_AB", "m_B", false],
-    ["m_B", "m_BC", false],
-    ["m_BC", "m_C", false],
-    ["m_C", "m_CD", false],
-    ["m_CD", "m_D", false],
-    ["m_D", "m_e", false],
-
-    // ── Middle → row1 north road connectors (two-way) ─────────────
-    ["m_w", "r1_w", false],
-    ["r1_w", "r1_E", false],
-    ["m_AB", "r1_EF", false],
-    ["m_BC", "r1_FG", false],
+    // Middle→row1 connectors two-way
+    ["m_w", "r1_w", false], ["m_AB", "r1_EF", false], ["m_BC", "r1_FG", false],
     ["m_e", "r1_e", false],
 
-    // ── Row-1 north road (two-way) ────────────────────────────────
-    ["r1_E", "r1_EF", false],
-    ["r1_EF", "r1_F", false],
-    ["r1_F", "r1_FG", false],
-    ["r1_FG", "r1_G", false],
-    ["r1_G", "r1_e", false],
+    // Row-1 north horizontal two-way
+    ["r1_w", "r1_E", false], ["r1_E", "r1_EF", false], ["r1_EF", "r1_F", false],
+    ["r1_F", "r1_FG", false], ["r1_FG", "r1_G", false], ["r1_G", "r1_e", false],
 
-    // ── Row-1 south vertical connectors ───────────────────────────
-    ["r1_E", "s_E", false],
-    ["r1_EF", "s_EF", false],
-    ["r1_F", "s_F", false],
-    ["r1_FG", "s_FG", false],
-    ["r1_G", "s_G", false],
+    // Inter-block verticals two-way
+    ["n_AB", "m_AB", false], ["n_BC", "m_BC", false], ["n_CD", "m_CD", false],
+    ["r1_EF", "s_EF", false], ["r1_FG", "s_FG", false],
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // HOUSE ACCESS — driveways from road intersections to houses
-    // North rows connect from n_ nodes, south rows from m_ nodes
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // --- Block A Alley & Driveways ---
+    ["n_A", "drv_A1", false], ["drv_A1", "drv_A2", false], ["drv_A2", "drv_A3", false], ["drv_A3", "m_A", false],
+    ["drv_A1", "a1", false], ["drv_A1", "a4", false],
+    ["drv_A2", "a2", false], ["drv_A2", "a5", false],
+    ["drv_A3", "a3", false], ["drv_A3", "a6", false],
 
-    // Block A driveways
-    ["n_A", "a1", false], ["n_A", "a2", false], ["n_A", "a3", false],
-    ["m_A", "a4", false], ["m_A", "a5", false], ["m_A", "a6", false],
+    // --- Block B Alley & Driveways ---
+    ["n_B", "drv_B1", false], ["drv_B1", "drv_B2", false], ["drv_B2", "drv_B3", false], ["drv_B3", "m_B", false],
+    ["drv_B1", "b1", false], ["drv_B1", "b4", false],
+    ["drv_B2", "b2", false], ["drv_B2", "b5", false],
+    ["drv_B3", "b3", false], ["drv_B3", "b6", false],
 
-    // Block B driveways
-    ["n_B", "b1", false], ["n_B", "b2", false], ["n_B", "b3", false],
-    ["m_B", "b4", false], ["m_B", "b5", false], ["m_B", "b6", false],
+    // --- Block C Alley & Driveways ---
+    ["n_C", "drv_C1", false], ["drv_C1", "drv_C2", false], ["drv_C2", "drv_C3", false], ["drv_C3", "m_C", false],
+    ["drv_C1", "c1", false], ["drv_C1", "c4", false],
+    ["drv_C2", "c2", false], ["drv_C2", "c5", false],
+    ["drv_C3", "c3", false], ["drv_C3", "c6", false],
 
-    // Block C driveways
-    ["n_C", "c1", false], ["n_C", "c2", false], ["n_C", "c3", false],
-    ["m_C", "c4", false], ["m_C", "c5", false], ["m_C", "c6", false],
+    // --- Block D Alley & Driveways ---
+    ["n_D", "drv_D1", false], ["drv_D1", "drv_D2", false], ["drv_D2", "drv_D3", false], ["drv_D3", "m_D", false],
+    ["drv_D1", "d1", false], ["drv_D1", "d4", false],
+    ["drv_D2", "d2", false], ["drv_D2", "d5", false],
+    ["drv_D3", "d3", false], ["drv_D3", "d6", false],
 
-    // Block D driveways
-    ["n_D", "d1", false], ["n_D", "d2", false], ["n_D", "d3", false],
-    ["m_D", "d4", false], ["m_D", "d5", false], ["m_D", "d6", false],
+    // --- Block E Alley & Driveways ---
+    ["r1_E", "drv_E1", false], ["drv_E1", "drv_E2", false], ["drv_E2", "drv_E3", false], ["drv_E3", "s_E", false],
+    ["drv_E1", "e1", false], ["drv_E1", "e4", false],
+    ["drv_E2", "e2", false], ["drv_E2", "e5", false],
+    ["drv_E3", "e3", false], ["drv_E3", "e6", false],
 
-    // Block E driveways (from row-1 roads)
-    ["r1_E", "e1", false], ["r1_E", "e2", false], ["r1_E", "e3", false],
-    ["s_E", "e4", false], ["s_E", "e5", false], ["s_E", "e6", false],
+    // --- Block F Alley & Driveways ---
+    ["r1_F", "drv_F1", false], ["drv_F1", "drv_F2", false], ["drv_F2", "drv_F3", false], ["drv_F3", "s_F", false],
+    ["drv_F1", "f1", false], ["drv_F1", "f4", false],
+    ["drv_F2", "f2", false], ["drv_F2", "f5", false],
+    ["drv_F3", "f3", false], ["drv_F3", "f6", false],
 
-    // Block F driveways
-    ["r1_F", "f1", false], ["r1_F", "f2", false], ["r1_F", "f3", false],
-    ["s_F", "f4", false], ["s_F", "f5", false], ["s_F", "f6", false],
-
-    // Block G driveways
-    ["r1_G", "g1", false], ["r1_G", "g2", false], ["r1_G", "g3", false],
-    ["s_G", "g4", false], ["s_G", "g5", false], ["s_G", "g6", false],
+    // --- Block G Alley & Driveways ---
+    ["r1_G", "drv_G1", false], ["drv_G1", "drv_G2", false], ["drv_G2", "drv_G3", false], ["drv_G3", "s_G", false],
+    ["drv_G1", "g1", false], ["drv_G1", "g4", false],
+    ["drv_G2", "g2", false], ["drv_G2", "g5", false],
+    ["drv_G3", "g3", false], ["drv_G3", "g6", false],
 ];
 
-/** Euclidean distance between two node positions */
-export function nodeDist(idA, idB) {
-    const a = NODES[idA]?.pos;
-    const b = NODES[idB]?.pos;
-    if (!a || !b) return 0;
-    return Math.sqrt((a[0] - b[0]) ** 2 + (a[2] - b[2]) ** 2);
-}
-
-/** All address (delivery) nodes as array */
-export const ADDRESS_NODES = Object.entries(NODES)
-    .filter(([, v]) => v.type === "address")
-    .map(([id, v]) => ({ id, ...v }));
-
-/** One-way edge keys for rendering arrows */
+// Helper to get one-way edges
 export const ONE_WAY_EDGES = EDGES.filter(e => e[2] === true);
