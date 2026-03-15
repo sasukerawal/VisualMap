@@ -5,14 +5,14 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 
-// 30 vibrant but harmonious house colors
+// 30 realistic suburban house colors (siding, brick, stucco)
 const HOUSE_COLORS = [
-    '#e74c55', '#e87d3e', '#e8b84b', '#7ec850', '#3ec88a',
-    '#3eb8e8', '#4a7de8', '#8b5ce8', '#e85cc8', '#e84a7a',
-    '#c84e3e', '#c87c3e', '#c8aa3e', '#6cb840', '#3aad78',
-    '#3aadc8', '#4070c8', '#7a50c8', '#c850b8', '#c84068',
-    '#ff8a65', '#ffb74d', '#fff176', '#a5d66a', '#4dd0e1',
-    '#64b5f6', '#9575cd', '#f06292', '#80cbc4', '#dce775',
+    '#e1d7c9', '#d4ceb8', '#bcc4cb', '#a4b1bb', '#c5bbae',
+    '#b4a390', '#c2c9d1', '#9ca8b5', '#d6d1c4', '#e8e4db',
+    '#9ea498', '#8b968c', '#a69076', '#bdab94', '#dcd8ce',
+    '#c4b7a6', '#d1ccc0', '#b9b0a2', '#828c98', '#666666',
+    '#b0a89f', '#c9cfd4', '#d8d4cb', '#8b7d6b', '#a69f95',
+    '#e2dfd8', '#c0c5c1', '#9a8f82', '#b3b8b1', '#d4ccbf'
 ];
 
 export function House({ position, colorIndex, scale = [1, 1, 1] }) {

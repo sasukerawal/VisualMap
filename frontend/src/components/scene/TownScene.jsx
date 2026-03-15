@@ -13,38 +13,58 @@ import { Warehouse } from './Warehouse';
 import { DeliveryVan } from './DeliveryVan';
 import { NodeMarker } from './NodeMarker';
 import { DeliveryPin } from './DeliveryPin';
+import { Tree } from './Tree';
 import { NODES, EDGES, ADDRESS_NODES } from '../../data/townGraph';
 import useStore from '../../store/useStore';
 
 // Block definitions: center [cx, cz] and color theme index
+// Each block is split into Left and Right lots with an alleyway in the middle
 const BLOCKS = [
-    { id: 'A', cx: -18, cz: -16 },
-    { id: 'B', cx: -2, cz: -16 },
-    { id: 'C', cx: 14, cz: -16 },
-    { id: 'D', cx: 30, cz: -16 },
-    { id: 'E', cx: -11, cz: 10 },
-    { id: 'F', cx: 3, cz: 10 },
-    { id: 'G', cx: 17, cz: 10 },
+    { id: 'A', cx: -18, cz: -14, w: 20, d: 22 },
+    { id: 'B', cx: -2, cz: -14, w: 20, d: 22 },
+    { id: 'C', cx: 14, cz: -14, w: 20, d: 22 },
+    { id: 'D', cx: 30, cz: -14, w: 20, d: 22 },
+    { id: 'E', cx: -11, cz: 11, w: 20, d: 16 },
+    { id: 'F', cx: 3, cz: 11, w: 20, d: 16 },
+    { id: 'G', cx: 17, cz: 11, w: 20, d: 16 },
 ];
 
-// Block sidewalk/pavement pads
-function BlockPad({ cx, cz }) {
-    return (
-        <mesh receiveShadow position={[cx, 0.01, cz]}>
-            <boxGeometry args={[14, 0.06, 12]} />
-            <meshStandardMaterial color="#d4c9b8" roughness={0.95} />
-        </mesh>
-    );
-}
+// A green lawn with a white concrete sidewalk border
+// And sprinkled trees inside
+function BlockLot({ cx, cz, w, d, seed }) {
+    // Generate some random tree positions within this lot
+    const trees = useMemo(() => {
+        const arr = [];
+        const count = 3;
+        for (let i = 0; i < count; i++) {
+            const rx = (Math.sin(seed * 42 + i * 17) * 0.4) * w;
+            const rz = (Math.cos(seed * 24 + i * 13) * 0.4) * d;
+            const isPine = Math.sin(seed + i) > 0;
+            // Place trees away from the direct center to avoid clipping with houses
+            if (Math.abs(rx) > 2 || Math.abs(rz) > 2) {
+                arr.push({ x: rx, z: rz, type: isPine ? 'pine' : 'deciduous', scale: 0.8 + Math.abs(Math.sin(seed * i)) * 0.4 });
+            }
+        }
+        return arr;
+    }, [w, d, seed]);
 
-// Block boundary (low wall / curb)
-function BlockOutline({ cx, cz }) {
-    const w = 14.4, d = 12.4, h = 0.25;
     return (
-        <mesh position={[cx, h / 2, cz]}>
-            <boxGeometry args={[w, h, d]} />
-            <meshStandardMaterial color="#b8c0cc" roughness={0.9} wireframe={false} />
-        </mesh>
+        <group position={[cx, 0, cz]}>
+            {/* Sidewalk base */}
+            <mesh receiveShadow position={[0, 0.02, 0]}>
+                <boxGeometry args={[w + 0.8, 0.04, d + 0.8]} />
+                <meshStandardMaterial color="#e0e6ed" roughness={0.95} />
+            </mesh>
+            {/* Green Lawn */}
+            <mesh receiveShadow position={[0, 0.05, 0]}>
+                <boxGeometry args={[w, 0.04, d]} />
+                <meshStandardMaterial color="#587e41" roughness={0.9} />
+            </mesh>
+            {/* Trees */}
+            {trees.map((t, i) => (
+                <Tree key={i} position={[t.x, 0.07, t.z]} scale={t.scale} type={t.type} />
+            ))}
+        </group>
     );
 }
 
@@ -107,6 +127,7 @@ function SceneContent() {
     }, [cameraAngle, camera]);
 
     const finalPath = routeResult?.path || [];
+    const addressNodeIds = useMemo(() => new Set(ADDRESS_NODES.map(n => n.id)), []);
     const finalEdgeSet = useMemo(() => {
         const s = new Set();
         (routeResult?.edges_traversed || []).forEach(([a, b]) => { s.add(`${a}-${b}`); s.add(`${b}-${a}`); });
@@ -134,39 +155,36 @@ function SceneContent() {
         <>
             <CameraRig cameraAngle={cameraAngle} />
 
-            {/* Stars & atmosphere */}
-            <Stars radius={120} depth={50} count={1500} factor={3} fade speed={0.2} />
-            <fog attach="fog" args={['#1a2035', 60, 130]} />
+            {/* Atmosphere (Daytime) */}
+            <fog attach="fog" args={['#87CEEB', 60, 150]} />
 
-            {/* Lights */}
-            <ambientLight intensity={0.55} color="#ddeeff" />
+            {/* Lights (Bright Daylight) */}
+            <ambientLight intensity={1.3} color="#ffffff" />
             <directionalLight
                 castShadow
-                position={[-20, 40, 20]}
-                intensity={1.8}
-                color="#fff5e8"
+                position={[-30, 60, 40]}
+                intensity={2.8}
+                color="#fffcf0"
                 shadow-mapSize={[2048, 2048]}
                 shadow-camera-far={120}
-                shadow-camera-left={-50}
-                shadow-camera-right={50}
-                shadow-camera-top={50}
-                shadow-camera-bottom={-50}
+                shadow-camera-left={-60}
+                shadow-camera-right={60}
+                shadow-camera-top={60}
+                shadow-camera-bottom={-60}
+                shadow-bias={-0.0005}
             />
-            <pointLight position={[-34, 5, -16]} color="#ffd700" intensity={3} distance={14} />
-            <pointLight position={[4, 6, -4]} color="#6480ff" intensity={1.5} distance={35} />
-            <pointLight position={[4, 6, 10]} color="#5566ff" intensity={1} distance={30} />
 
-            {/* Ground */}
+            {/* Ground (Dirt/Earth underneath) */}
             <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
                 <planeGeometry args={[120, 90]} />
-                <meshStandardMaterial color="#2a3040" roughness={0.95} />
+                <meshStandardMaterial color="#524636" roughness={0.95} />
             </mesh>
 
-            {/* Block pads and outlines */}
+            {/* Block Lots (Left and Right of the alleyway) */}
             {BLOCKS.map(b => (
                 <group key={b.id}>
-                    <BlockOutline cx={b.cx} cz={b.cz} />
-                    <BlockPad cx={b.cx} cz={b.cz} />
+                    <BlockLot cx={b.cx - 5} cz={b.cz} w={b.w / 2 - 2} d={b.d - 2} seed={b.cx} />
+                    <BlockLot cx={b.cx + 5} cz={b.cz} w={b.w / 2 - 2} d={b.d - 2} seed={b.cz} />
                 </group>
             ))}
 
@@ -179,6 +197,7 @@ function SceneContent() {
                     oneWay={ow}
                     isExplored={exploredSet.has(`${a}-${b}`) || exploredSet.has(`${b}-${a}`)}
                     isFinal={finalEdgeSet.has(`${a}-${b}`)}
+                    isDriveway={addressNodeIds.has(a) || addressNodeIds.has(b)}
                 />
             ))}
 
@@ -230,7 +249,7 @@ function SceneContent() {
 export function TownScene() {
     const { cameraAngle } = useStore();
     return (
-        <div style={{ width: '100%', height: '100%', background: '#1a2035' }}>
+        <div style={{ width: '100%', height: '100%', background: '#87CEEB' }}>
             <Canvas
                 shadows
                 camera={{ fov: 50, position: [-5, 38, 50], near: 0.1, far: 200 }}
