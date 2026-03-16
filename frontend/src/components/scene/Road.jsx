@@ -12,7 +12,8 @@ export const Road = memo(function Road({ from, to, oneWay = false, isExplored, i
     const [hovered, setHovered] = useState(false);
     if (!from || !to) return null;
 
-    const roadOffset = isDriveway ? 0.09 : 0.045;
+    // Keep a single surface offset for ALL road types so segments meet cleanly at intersections.
+    const roadOffset = 0.055;
 
     const { position, quat, length, planarLength } = useMemo(() => {
         const s = new THREE.Vector3(from[0], groundHeightAt(from[0], from[2]) + roadOffset, from[2]);
