@@ -30,6 +30,43 @@ function forceHomeView(controls) {
     controls.saveState?.();
 }
 
+function isBadNumber(v) {
+    return typeof v !== 'number' || !Number.isFinite(v);
+}
+
+function ControlsSanityGuard({ controlsRef }) {
+    const lastOkRef = useRef(performance.now());
+
+    useFrame(() => {
+        const controls = controlsRef.current;
+        const cam = controls?.object;
+        const t = controls?.target;
+        if (!controls || !cam || !t) return;
+
+        const badTarget =
+            isBadNumber(t.x) || isBadNumber(t.y) || isBadNumber(t.z) ||
+            Math.abs(t.x) > 250 || Math.abs(t.z) > 250;
+
+        const badCam =
+            isBadNumber(cam.position.x) || isBadNumber(cam.position.y) || isBadNumber(cam.position.z) ||
+            cam.position.y < 5 || cam.position.y > 250 ||
+            (cam.isOrthographicCamera && (isBadNumber(cam.zoom) || cam.zoom < 2 || cam.zoom > 60));
+
+        const now = performance.now();
+        if (!badTarget && !badCam) {
+            lastOkRef.current = now;
+            return;
+        }
+
+        // Only auto-reset if we've been in a bad state long enough to not fight user input.
+        if (now - lastOkRef.current < 250) return;
+        forceHomeView(controls);
+        lastOkRef.current = now;
+    });
+
+    return null;
+}
+
 function CanvasResizeFix({ depsKey }) {
     const { gl, camera, size, invalidate } = useThree();
 
@@ -221,6 +258,7 @@ export const TownTopography2D = forwardRef(function TownTopography2D({ selectedO
                 }}
             >
                 <CanvasResizeFix depsKey={stepsLen} />
+                <ControlsSanityGuard controlsRef={controlsRef} />
                 <TownWorld
                     forcedCameraAngle="top"
                     selectedOnlyAddresses={selectedOnly}
