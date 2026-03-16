@@ -1,62 +1,59 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 const ALGO_PSEUDOCODE = {
     dijkstra: [
-        { line: 'function Dijkstra(graph, start):', indent: 0 },
-        { line: '  for each node n in graph:', indent: 0 },
-        { line: '    dist[n] = infinity, prev[n] = undefined', indent: 0 },
-        { line: '    priority_queue.add(n, dist[n])', indent: 0 },
-        { line: '  dist[start] = 0', indent: 0 },
-        { line: '  while priority_queue is not empty:', indent: 0 },
-        { line: '    u = priority_queue.extract_min()', indent: 1 },
-        { line: '    for each neighbor v of u:', indent: 1 },
-        { line: '      alt = dist[u] + weight(u, v)', indent: 2 },
-        { line: '      if alt < dist[v]:', indent: 2 },
-        { line: '        dist[v] = alt, prev[v] = u', indent: 3 },
-        { line: '        priority_queue.decrease_priority(v, alt)', indent: 3 }
+        { no: 1, line: 'function Dijkstra(graph, start):' },
+        { no: 2, line: '  dist[*] = ∞; prev[*] = undefined; dist[start] = 0' },
+        { no: 3, line: '  heap.push(0, start)' },
+        { no: 4, line: '  while heap not empty:' },
+        { no: 5, line: '    (d, u) = heap.pop_min()   // settle u' },
+        { no: 6, line: '    if u == goal: break' },
+        { no: 7, line: '    for each neighbor v of u:' },
+        { no: 8, line: '      new = dist[u] + time_cost(u, v)' },
+        { no: 9, line: '      if new < dist[v]:' },
+        { no: 10, line: '        dist[v] = new; prev[v] = u; heap.push(new, v)' },
     ],
     astar: [
-        { line: 'function AStar(graph, start, goal):', indent: 0 },
-        { line: '  openSet = {start}', indent: 0 },
-        { line: '  gScore[start] = 0', indent: 0 },
-        { line: '  fScore[start] = h(start)', indent: 0 },
-        { line: '  while openSet is not empty:', indent: 0 },
-        { line: '    u = node in openSet with lowest fScore', indent: 1 },
-        { line: '    if u == goal: return reconstruct_path(u)', indent: 1 },
-        { line: '    for each neighbor v of u:', indent: 1 },
-        { line: '      tentative_g = gScore[u] + weight(u, v)', indent: 2 },
-        { line: '      if tentative_g < gScore[v]:', indent: 2 },
-        { line: '        prev[v] = u, gScore[v] = tentative_g', indent: 3 },
-        { line: '        fScore[v] = gScore[v] + h(v)', indent: 3 },
-        { line: '        if v not in openSet: openSet.add(v)', indent: 3 }
+        { no: 1, line: 'function AStarFuel(graph, start, goal):' },
+        { no: 2, line: '  gFuel[*]=∞; gTime[*]=∞; gDist[*]=∞; prev[*]=undefined' },
+        { no: 3, line: '  gFuel[start]=0; gTime[start]=0; gDist[start]=0' },
+        { no: 4, line: '  open.push(fFuel(start)=hDist(start), start)' },
+        { no: 5, line: '  while open not empty:' },
+        { no: 6, line: '    u = open.pop_min_fFuel()' },
+        { no: 7, line: '    if u == goal: return reconstruct_path(u)' },
+        { no: 8, line: '    for each neighbor v of u:' },
+        { no: 9, line: '      edgeFuel = dist(u,v) * slopeMultiplier(elev(u→v))' },
+        { no: 10, line: '      if gFuel[u] + edgeFuel < gFuel[v]:' },
+        { no: 11, line: '        prev[v]=u; update gFuel/gTime/gDist; push(open, fFuel=v)' },
     ],
     bellman_ford: [
-        { line: 'function BellmanFord(graph, start):', indent: 0 },
-        { line: '  dist[start] = 0', indent: 0 },
-        { line: '  for i from 1 to |V| - 1:', indent: 0 },
-        { line: '    for each edge (u, v) with weight w:', indent: 1 },
-        { line: '      if dist[u] + w < dist[v]:', indent: 2 },
-        { line: '        dist[v] = dist[u] + w, prev[v] = u', indent: 3 },
-        { line: '  for each edge (u, v) with weight w:', indent: 0 },
-        { line: '    if dist[u] + w < dist[v]: error "Negative cycle"', indent: 1 }
+        { no: 1, line: 'function BellmanFord(graph, start):' },
+        { no: 2, line: '  dist[*]=∞; prev[*]=undefined; dist[start]=0' },
+        { no: 3, line: '  for round in 1..|V|-1:' },
+        { no: 4, line: '    for each edge (u,v):' },
+        { no: 5, line: '      if dist[u] + time_cost(u,v) < dist[v]:' },
+        { no: 6, line: '        dist[v]=dist[u]+time_cost; prev[v]=u' },
+        { no: 7, line: '  extra pass: if any edge relaxes → negative cycle' },
     ]
-};
-
-// Map simulation states to pseudocode line indices
-const STEP_MAP = {
-    'dijkstra': { 'extract': 6, 'relax': 10 },
-    'astar': { 'extract': 5, 'relax': 11 },
-    'bellman_ford': { 'relax': 5 }
 };
 
 export default function PseudocodeViewer({ algorithm, currentStep, simpleMode = false }) {
     const lines = ALGO_PSEUDOCODE[algorithm] || [];
-    const activeMapping = STEP_MAP[algorithm] || {};
 
-    // Determine which line to highlight based on step action
-    let activeLineIndex = -1;
-    if (currentStep?.action === 'extract') activeLineIndex = activeMapping.extract;
-    else if (currentStep?.action === 'relax' || currentStep?.neighbors_updated) activeLineIndex = activeMapping.relax;
+    const activeLineNo = useMemo(() => {
+        if (typeof currentStep?.active_line === 'number') return currentStep.active_line;
+        // Fallbacks if older steps don’t have active_line.
+        if (algorithm === 'dijkstra') return 5;
+        if (algorithm === 'astar') return 6;
+        if (algorithm === 'bellman_ford') return 3;
+        return null;
+    }, [currentStep?.active_line, algorithm]);
+
+    const explanation = currentStep?.explanation || currentStep?.description || '';
+    const math = currentStep?.math_breakdown || null;
+
+    const formatNumber = (n, digits = 2) =>
+        typeof n === 'number' && Number.isFinite(n) ? n.toFixed(digits) : null;
 
     const baseStyle = {
         fontFamily: '"JetBrains Mono", monospace',
@@ -93,27 +90,80 @@ export default function PseudocodeViewer({ algorithm, currentStep, simpleMode = 
             )}
 
             <div style={{ marginTop: simpleMode ? '0' : '24px', overflowY: 'auto', height: '100%', scrollbarWidth: 'none' }}>
-                {lines.map((item, idx) => (
-                    <div
-                        key={idx}
-                        style={{
-                            padding: '1px 8px',
-                            borderRadius: 4,
-                            background: activeLineIndex === idx ? 'rgba(34, 211, 238, 0.12)' : 'transparent',
-                            color: activeLineIndex === idx ? '#fff' : 'inherit',
-                            borderLeft: activeLineIndex === idx ? '2px solid #06b6d4' : '2px solid transparent',
-                            transition: 'all 0.2s ease',
-                            whiteSpace: 'pre',
-                            opacity: activeLineIndex === -1 || activeLineIndex === idx ? 1 : 0.4,
-                            fontSize: '11px'
-                        }}
-                    >
-                        <span style={{ opacity: 0.2, marginRight: 8, fontSize: '9px', display: 'inline-block', width: '12px' }}>
-                            {idx + 1}
-                        </span>
-                        {item.line}
+                {!simpleMode && explanation && (
+                    <div style={{
+                        marginBottom: 12,
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        background: 'rgba(34,211,238,0.08)',
+                        border: '1px solid rgba(34,211,238,0.18)',
+                        color: '#d9fbff',
+                        fontSize: 11,
+                        lineHeight: 1.5,
+                        fontFamily: 'var(--font-sans)',
+                        fontWeight: 650,
+                    }}>
+                        {explanation}
+                        {algorithm === 'astar' && typeof currentStep?.fuel_cost === 'number' && (
+                            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, fontFamily: '"JetBrains Mono", monospace', fontSize: 10, color: '#b7c7e6' }}>
+                                <span>time={formatNumber(currentStep.distance, 2) ?? '—'}s</span>
+                                <span>dist={formatNumber(currentStep.raw_distance, 2) ?? '—'}u</span>
+                                <span>fuel={formatNumber(currentStep.fuel_cost, 2) ?? '—'}</span>
+                                <span>f_fuel={formatNumber(currentStep.f_fuel, 2) ?? '—'}</span>
+                            </div>
+                        )}
                     </div>
-                ))}
+                )}
+
+                {!simpleMode && math && (
+                    <div style={{
+                        marginBottom: 12,
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(148,163,184,0.14)',
+                        fontSize: 10,
+                        color: '#cbd5e1',
+                    }}>
+                        <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9fb0ca', marginBottom: 6 }}>
+                            Math Breakdown
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontFamily: '"JetBrains Mono", monospace' }}>
+                            {Object.entries(math).map(([k, v]) => (
+                                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                                    <span style={{ color: '#8ea3c2' }}>{k}</span>
+                                    <span>{typeof v === 'number' ? v.toFixed(2) : String(v)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {lines.map((item) => {
+                    const isActive = activeLineNo != null && item.no === activeLineNo;
+                    const dim = activeLineNo != null && !isActive;
+                    return (
+                        <div
+                            key={item.no}
+                            style={{
+                                padding: '2px 10px',
+                                borderRadius: 8,
+                                background: isActive ? 'rgba(34, 211, 238, 0.12)' : 'transparent',
+                                color: isActive ? '#fff' : 'inherit',
+                                borderLeft: isActive ? '3px solid #06b6d4' : '3px solid transparent',
+                                transition: 'all 0.18s ease',
+                                whiteSpace: 'pre',
+                                opacity: dim ? 0.35 : 1,
+                                fontSize: '11px'
+                            }}
+                        >
+                            <span style={{ opacity: 0.22, marginRight: 10, fontSize: '9px', display: 'inline-block', width: 18 }}>
+                                {item.no}
+                            </span>
+                            {item.line}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
