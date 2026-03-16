@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useStore from '../../store/useStore';
-import { TownMap2D } from '../scene/TownMap2D';
+import { TownTopography2D } from '../scene/TownTopography2D';
 
 // Legend categories matching the reference style.
 const LEGEND_ITEMS = [
@@ -181,7 +181,7 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
     if (dashboardMode) {
         return (
             <div style={{ width: '100%', height: '100%', position: 'relative', borderRadius: 16, overflow: 'hidden' }}>
-                <TownMap2D ref={mapRef} selectedOnly />
+                <TownTopography2D ref={mapRef} selectedOnly />
                 <ZoneOverlay />
                 <LegendOverlay dashboardMode />
             </div>
@@ -200,7 +200,7 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
                 position: 'relative',
             }}
         >
-            <TownMap2D ref={mapRef} selectedOnly />
+            <TownTopography2D ref={mapRef} selectedOnly />
             <ZoneOverlay />
             <LegendOverlay dashboardMode={false} />
         </div>
@@ -352,7 +352,7 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
                         </div>
 
                         <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-                            <TownMap2D ref={mapRefExpanded} selectedOnly />
+                            <TownTopography2D ref={mapRefExpanded} selectedOnly />
                             <ZoneOverlay />
                             <LegendOverlay dashboardMode />
                         </div>

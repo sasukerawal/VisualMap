@@ -75,9 +75,10 @@ function BlockLot({ cx, cz, w, d, seed }) {
 }
 
 /** Camera controller that resets when cameraAngle changes */
-function CameraRig({ cameraAngle }) {
+function CameraRig({ cameraAngle, controlsRef: externalControlsRef }) {
     const { camera, gl } = useThree();
-    const controlsRef = useRef();
+    const localControlsRef = useRef();
+    const controlsRef = externalControlsRef ?? localControlsRef;
 
     useEffect(() => {
         if (cameraAngle === 'top') {
@@ -111,13 +112,23 @@ function CameraRig({ cameraAngle }) {
             maxPolarAngle={Math.PI / 2.2}
             minDistance={15}
             maxDistance={120}
+            minZoom={6}
+            maxZoom={26}
             target={[0, 0, -2]}
         />
     );
 }
 
-function SceneContent() {
-    const { cameraAngle, showLabels, destinations, exploredNodes, exploredEdges, routeResult, stepsResult, currentStepIndex } = useStore(
+export function TownWorld({
+    forcedCameraAngle,
+    selectedOnlyAddresses = false,
+    forceShowLabels,
+    forceUiOverlayOpen,
+    showBlocks = true,
+    showVan = true,
+    controlsRef,
+} = {}) {
+    const { cameraAngle: storeCameraAngle, showLabels: storeShowLabels, destinations, exploredNodes, exploredEdges, routeResult, stepsResult, currentStepIndex } = useStore(
         (s) => ({
             cameraAngle: s.cameraAngle,
             showLabels: s.showLabels,
@@ -130,8 +141,12 @@ function SceneContent() {
         }),
         shallow
     );
-    const uiOverlayOpen = useStore((s) => s.isUiOverlayOpen);
+    const storeUiOverlayOpen = useStore((s) => s.isUiOverlayOpen);
     const { camera } = useThree();
+
+    const cameraAngle = forcedCameraAngle ?? storeCameraAngle;
+    const showLabels = typeof forceShowLabels === 'boolean' ? forceShowLabels : storeShowLabels;
+    const uiOverlayOpen = typeof forceUiOverlayOpen === 'boolean' ? forceUiOverlayOpen : storeUiOverlayOpen;
 
     const terrainGeo = useMemo(() => {
         const geo = new THREE.PlaneGeometry(120, 90, 120, 90);
@@ -179,6 +194,13 @@ function SceneContent() {
         return [p[0], groundHeightAt(p[0], p[2]), p[2]];
     }, []);
 
+    const visibleAddressNodes = useMemo(() => {
+        if (!selectedOnlyAddresses) return ADDRESS_NODES;
+        if (!destinations?.length) return [];
+        const set = new Set(destinations);
+        return ADDRESS_NODES.filter((n) => set.has(n.id));
+    }, [selectedOnlyAddresses, destinations?.join('|')]);
+
     // Edges belonging to the final shortest path
     const finalEdgeSet = useMemo(() => {
         const s = new Set();
@@ -221,7 +243,7 @@ function SceneContent() {
 
     return (
         <>
-            <CameraRig cameraAngle={cameraAngle} />
+            <CameraRig cameraAngle={cameraAngle} controlsRef={controlsRef} />
 
             {/* Atmosphere (Daytime) */}
             <fog attach="fog" args={['#87CEEB', 60, 150]} />
@@ -250,12 +272,12 @@ function SceneContent() {
             </mesh>
 
             {/* Block Lots (Left and Right of the alleyway) */}
-            {BLOCKS.map(b => (
+            {showBlocks ? BLOCKS.map(b => (
                 <group key={b.id}>
                     <BlockLot cx={b.cx - 5} cz={b.cz} w={b.w / 2 - 2} d={b.d - 2} seed={b.cx} />
                     <BlockLot cx={b.cx + 5} cz={b.cz} w={b.w / 2 - 2} d={b.d - 2} seed={b.cz} />
                 </group>
-            ))}
+            )) : null}
 
             {/* Roads */}
             {EDGES.map((edge, i) => {
@@ -279,7 +301,7 @@ function SceneContent() {
             })}
 
             {/* Houses */}
-            {ADDRESS_NODES.map((node, i) => (
+            {visibleAddressNodes.map((node, i) => (
                 <House
                     key={node.id}
                     nodeId={node.id}
@@ -306,7 +328,7 @@ function SceneContent() {
                 ))}
 
             {/* Delivery pins — sit ON TOP of each house */}
-            {ADDRESS_NODES.map((node) => (
+            {visibleAddressNodes.map((node) => (
                 <DeliveryPin
                     key={node.id}
                     nodeId={node.id}
@@ -320,7 +342,7 @@ function SceneContent() {
             ))}
 
             {/* Delivery Van */}
-            <DeliveryVan />
+            {showVan ? <DeliveryVan /> : null}
         </>
     );
 }
@@ -336,7 +358,7 @@ export function TownScene() {
                 dpr={[1, 1.5]}
                 gl={{ antialias: true, failIfMajorPerformanceCaveat: false, powerPreference: 'high-performance' }}
             >
-                <SceneContent />
+                <TownWorld />
             </Canvas>
         </div>
     );
