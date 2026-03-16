@@ -117,6 +117,9 @@ export function TheoryOverlay() {
         routeResult,
         currentSegment,
         setStepsResult,
+        isTimelinePlaying,
+        isTimelinePaused,
+        animationSpeed,
     } = useStore();
 
     if (!routeResult || !destinations?.length) {
@@ -156,6 +159,86 @@ export function TheoryOverlay() {
 
     return (
         <div style={shellStyle}>
+            <div
+                style={{
+                    padding: '12px 14px',
+                    borderRadius: 18,
+                    border: '1px solid rgba(148,163,184,0.14)',
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+                    flexShrink: 0,
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                    <div>
+                        <div style={{ fontSize: 10, fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Search Progress</div>
+                        <div style={{ marginTop: 4, fontSize: 12, fontWeight: 900, color: '#eef2ff' }}>
+                            Consideration {currentStepIndex + 1} / {stepsResult.steps.length}
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        {[0.5, 1, 1.5, 2].map((s) => (
+                            <button
+                                key={s}
+                                onClick={() => useStore.getState().setAnimationSpeed(s)}
+                                style={{
+                                    padding: '6px 10px',
+                                    borderRadius: 999,
+                                    border: `1px solid ${animationSpeed === s ? 'rgba(91,156,246,0.35)' : 'rgba(148,163,184,0.16)'}`,
+                                    background: animationSpeed === s ? 'rgba(58,125,200,0.16)' : 'rgba(255,255,255,0.03)',
+                                    color: animationSpeed === s ? '#9fd0ff' : '#93a6c3',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    fontFamily: 'var(--font-mono)'
+                                }}
+                            >
+                                {s}x
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <input
+                    type="range"
+                    min="0"
+                    max={Math.max(0, (stepsResult?.steps?.length || 1) - 1)}
+                    value={currentStepIndex}
+                    onChange={(e) => setCurrentStepIndex(Number(e.target.value))}
+                    style={{ cursor: 'pointer', width: '100%', accentColor: '#35d7e8', height: '6px' }}
+                />
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                    <button
+                        onClick={() => (isTimelinePlaying && !isTimelinePaused ? useStore.getState().pauseSimulation() : useStore.getState().runSimulation())}
+                        style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: 14,
+                            border: '1px solid rgba(34,211,238,0.22)',
+                            background: 'linear-gradient(135deg, rgba(34,211,238,0.18), rgba(91,156,246,0.14))',
+                            color: '#d6f9ff',
+                            fontWeight: 900,
+                            fontSize: '12px',
+                        }}
+                    >
+                        {isTimelinePlaying && !isTimelinePaused ? 'Pause Timeline' : 'Play Timeline'}
+                    </button>
+                    <button
+                        onClick={() => useStore.getState().resetSimulation()}
+                        style={{
+                            padding: '10px 12px',
+                            borderRadius: 14,
+                            border: '1px solid rgba(248,113,113,0.22)',
+                            background: 'rgba(248,113,113,0.1)',
+                            color: '#fca5a5',
+                            fontWeight: 900,
+                            fontSize: '12px',
+                        }}
+                    >
+                        Reset
+                    </button>
+                </div>
+            </div>
+
             <div
                 style={{
                     padding: '12px 14px',

@@ -15,6 +15,7 @@ import { NodeMarker } from './NodeMarker';
 import { DeliveryPin } from './DeliveryPin';
 import { Tree } from './Tree';
 import { NODES, EDGES, ADDRESS_NODES, displayNodeName } from '../../data/townGraph';
+import { elevationAt } from '../../data/elevation';
 import useStore from '../../store/useStore';
 import { shallow } from 'zustand/shallow';
 
@@ -130,6 +131,35 @@ function SceneContent() {
     const uiOverlayOpen = useStore((s) => s.isUiOverlayOpen);
     const { camera } = useThree();
 
+    const terrainGeo = useMemo(() => {
+        const geo = new THREE.PlaneGeometry(120, 90, 120, 90);
+        geo.rotateX(-Math.PI / 2);
+
+        const pos = geo.attributes.position;
+        const colors = new Float32Array(pos.count * 3);
+
+        // Keep amplitude subtle so roads/houses still read well.
+        const amp = 0.10;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const z = pos.getZ(i);
+            const e = elevationAt(x, z);
+            const y = e * amp;
+            pos.setY(i, y);
+
+            // Colorize: low -> cooler, high -> warmer
+            const t = Math.max(0, Math.min(1, (y / (amp * 3.0) + 0.5)));
+            const c = new THREE.Color().setHSL(0.28 - t * 0.10, 0.35, 0.20 + t * 0.12);
+            colors[i * 3 + 0] = c.r;
+            colors[i * 3 + 1] = c.g;
+            colors[i * 3 + 2] = c.b;
+        }
+        pos.needsUpdate = true;
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.computeVertexNormals();
+        return geo;
+    }, []);
+
     // Switch camera type on angle change
     useEffect(() => {
         if (cameraAngle === 'top') {
@@ -209,10 +239,9 @@ function SceneContent() {
                 shadow-bias={-0.0005}
             />
 
-            {/* Ground (Dirt/Earth underneath) */}
-            <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
-                <planeGeometry args={[120, 90]} />
-                <meshStandardMaterial color="#3b3a2f" roughness={0.98} />
+            {/* Ground (with subtle terrain elevation to visualize uphill/downhill) */}
+            <mesh receiveShadow position={[0, -0.07, 0]} geometry={terrainGeo}>
+                <meshStandardMaterial vertexColors roughness={0.98} metalness={0.0} />
             </mesh>
 
             {/* Block Lots (Left and Right of the alleyway) */}

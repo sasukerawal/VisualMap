@@ -582,11 +582,13 @@ function MapFlowView({ nodes, edges, onClose, internalHeader = true, dashboardMo
                         inset: 0,
                         pointerEvents: 'none',
                         background: [
-                            'radial-gradient(900px 540px at 62% 48%, rgba(251,191,36,0.12), rgba(0,0,0,0) 60%)',
-                            'radial-gradient(820px 520px at 20% 78%, rgba(56,189,248,0.08), rgba(0,0,0,0) 65%)',
+                            'radial-gradient(880px 520px at 62% 48%, rgba(251,191,36,0.20), rgba(0,0,0,0) 60%)',
+                            'radial-gradient(820px 520px at 20% 78%, rgba(56,189,248,0.14), rgba(0,0,0,0) 65%)',
+                            'repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, rgba(0,0,0,0) 10px, rgba(0,0,0,0) 18px)',
                         ].join(','),
                         opacity: 0.9,
                         zIndex: 0,
+                        mixBlendMode: 'screen',
                     }}
                 />
                 <ReactFlow
@@ -695,7 +697,7 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <span style={{ fontSize: '9px', fontWeight: 800, color: '#7a8aaa', textTransform: 'uppercase' }}>Search Progress</span>
                         <span style={{ fontSize: '10px', color: '#fbbf24', fontWeight: 800 }}>
-                            {hasSteps ? `Consideration ${currentStepIndex + 1} / ${stepsResult.steps.length}` : 'Ready (start simulation)'}
+                            {hasSteps ? `Consideration ${currentStepIndex + 1} / ${stepsResult.steps.length}` : 'Ready (start navigation)'}
                         </span>
                     </div>
                     {hasSteps ? (
