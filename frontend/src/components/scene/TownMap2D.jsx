@@ -6,7 +6,7 @@
  */
 import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, MapControls } from '@react-three/drei';
+import { Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import useStore from '../../store/useStore';
 import { shallow } from 'zustand/shallow';
@@ -30,7 +30,6 @@ function forceHomeView(controls) {
     controls.target?.copy?.(DEFAULT_TARGET);
 
     cam.position.copy(DEFAULT_CAM_POS);
-    cam.up.set(0, 0, -1);
     cam.zoom = DEFAULT_ZOOM;
     cam.near = 0.1;
     cam.far = 500;
@@ -47,21 +46,23 @@ function CameraAndControls({ controlsRef }) {
     useEffect(() => {
         // Orthographic top-down
         camera.position.copy(DEFAULT_CAM_POS);
-        camera.up.set(0, 0, -1);
         camera.zoom = DEFAULT_ZOOM;
         camera.near = 0.1;
         camera.far = 500;
         camera.lookAt(DEFAULT_TARGET);
         camera.updateProjectionMatrix();
 
-        // Ensure controls start centered on the town.
-        forceHomeView(controlsRef.current);
+        // Ensure controls start centered on the town (after ref attaches).
+        const id = requestAnimationFrame(() => forceHomeView(controlsRef.current));
+        return () => cancelAnimationFrame(id);
     }, [camera]);
 
     return (
-        <MapControls
+        <OrbitControls
             ref={controlsRef}
             enableRotate={false}
+            enablePan
+            enableZoom
             enableDamping
             dampingFactor={0.08}
             screenSpacePanning
@@ -69,7 +70,6 @@ function CameraAndControls({ controlsRef }) {
             panSpeed={0.9}
             minZoom={7}
             maxZoom={26}
-            target={[DEFAULT_TARGET.x, DEFAULT_TARGET.y, DEFAULT_TARGET.z]}
         />
     );
 }
