@@ -20,13 +20,33 @@ import { NodeMarker } from './NodeMarker';
 
 const DEFAULT_TARGET = new THREE.Vector3(0, 0, -2);
 const DEFAULT_ZOOM = 12.5;
+const DEFAULT_CAM_POS = new THREE.Vector3(0, 80, 0.01);
+
+function forceHomeView(controls) {
+    if (!controls) return;
+    const cam = controls.object;
+    if (!cam) return;
+
+    controls.target?.copy?.(DEFAULT_TARGET);
+
+    cam.position.copy(DEFAULT_CAM_POS);
+    cam.up.set(0, 0, -1);
+    cam.zoom = DEFAULT_ZOOM;
+    cam.near = 0.1;
+    cam.far = 500;
+    cam.lookAt(DEFAULT_TARGET);
+    cam.updateProjectionMatrix?.();
+
+    controls.update?.();
+    controls.saveState?.();
+}
 
 function CameraAndControls({ controlsRef }) {
     const { camera } = useThree();
 
     useEffect(() => {
         // Orthographic top-down
-        camera.position.set(0, 80, 0.01);
+        camera.position.copy(DEFAULT_CAM_POS);
         camera.up.set(0, 0, -1);
         camera.zoom = DEFAULT_ZOOM;
         camera.near = 0.1;
@@ -35,10 +55,7 @@ function CameraAndControls({ controlsRef }) {
         camera.updateProjectionMatrix();
 
         // Ensure controls start centered on the town.
-        const controls = controlsRef.current;
-        if (controls?.target) controls.target.copy(DEFAULT_TARGET);
-        controls?.update?.();
-        controls?.saveState?.();
+        forceHomeView(controlsRef.current);
     }, [camera]);
 
     return (
@@ -353,20 +370,30 @@ function Scene2D({ selectedOnly = true }) {
 
 export const TownMap2D = forwardRef(function TownMap2D({ selectedOnly = true }, ref) {
     const controlsRef = useRef();
+    const stepsLen = useStore((s) => s.stepsResult?.steps?.length || 0);
+    const hasCenteredOnSimRef = useRef(false);
 
     useImperativeHandle(ref, () => ({
         recenter: () => {
-            const controls = controlsRef.current;
-            if (controls?.target) controls.target.copy(DEFAULT_TARGET);
-            if (controls?.object) {
-                controls.object.zoom = DEFAULT_ZOOM;
-                controls.object.position.set(0, 80, 0.01);
-                controls.object.up.set(0, 0, -1);
-                controls.object.updateProjectionMatrix?.();
-            }
-            controls?.update?.();
+            forceHomeView(controlsRef.current);
         }
     }), []);
+
+    // Simulation start can cause controls to land in a bad state in some browsers.
+    // Do a one-time reset to the "home" view when steps first arrive.
+    useEffect(() => {
+        if (stepsLen <= 0) {
+            hasCenteredOnSimRef.current = false;
+            return;
+        }
+        if (hasCenteredOnSimRef.current) return;
+        hasCenteredOnSimRef.current = true;
+
+        const id = requestAnimationFrame(() => {
+            forceHomeView(controlsRef.current);
+        });
+        return () => cancelAnimationFrame(id);
+    }, [stepsLen]);
 
     return (
         <div style={{ position: 'absolute', inset: 0 }}>
