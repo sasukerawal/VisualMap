@@ -83,7 +83,10 @@ function CameraRig({ cameraAngle, controlsRef: externalControlsRef }) {
     useEffect(() => {
         if (cameraAngle === 'top') {
             camera.position.set(0, 80, 0.01);
-            camera.up.set(0, 0, -1);
+            // Keep a standard up-vector; the previous (0,0,-1) "north-up" hack makes
+            // orthographic + controls unstable during state updates in some environments.
+            camera.up.set(0, 1, 0);
+            camera.lookAt(0, 0, -2);
             if (camera.isOrthographicCamera) {
                 camera.zoom = 12;
                 camera.updateProjectionMatrix();
