@@ -7,13 +7,13 @@
  */
 import ReactFlow, { Background, Controls } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import useStore from '../../store/useStore';
 import { NODES } from '../../data/townGraph';
 
-function buildFlowGraph(stepsResult, isExpanded = false) {
+function buildFlowGraph(stepsResult, isExpanded = false, maxSteps = 1000) {
     if (!stepsResult?.steps?.length) return { nodes: [], edges: [] };
-    const steps = stepsResult.steps.slice(0, isExpanded ? 80 : 28);
+    const steps = stepsResult.steps.slice(0, Math.min(stepsResult.steps.length, maxSteps));
     const seen = new Map();
     const rfNodes = [];
     const rfEdges = [];
@@ -31,7 +31,7 @@ function buildFlowGraph(stepsResult, isExpanded = false) {
                 position: { x: (i % COLS) * COL_W + 10, y: Math.floor(i / COLS) * ROW_H + 10 },
                 data: {
                     label: (
-                        <div style={{ textAlign: 'center', lineHeight: 1.35, padding: '2px 0' }}>
+                        <div style={{ textAlign: 'center', lineHeight: 1.35, padding: '2px 0' }} title={`g=${step.distance?.toFixed ? step.distance.toFixed(1) : step.distance}${step.heuristic != null ? `\nh=${Number(step.heuristic).toFixed(1)}` : ''}${step.f_score != null ? `\nf=g+h=${Number(step.f_score).toFixed(1)}` : ''}`}>
                             <div style={{ fontWeight: 700, fontSize: '10px', color: isOnPath ? '#1e8449' : '#1a2a3a', marginBottom: 2 }}>
                                 {label.length > 12 ? label.slice(0, 12) + '…' : label}
                             </div>
@@ -77,16 +77,22 @@ function buildFlowGraph(stepsResult, isExpanded = false) {
 export function DecisionTree() {
     const { stepsResult, algorithm } = useStore();
     const [isExpanded, setIsExpanded] = useState(false);
+    const [currentStepLimit, setCurrentStepLimit] = useState(1);
 
-    const { nodes, edges } = useMemo(() => buildFlowGraph(stepsResult, isExpanded), [stepsResult, isExpanded]);
+    // Auto-reset slider when new result comes in
+    useEffect(() => {
+        if (stepsResult?.steps?.length) {
+            setCurrentStepLimit(stepsResult.steps.length);
+        }
+    }, [stepsResult]);
+
+    const { nodes, edges } = useMemo(() => buildFlowGraph(stepsResult, isExpanded, currentStepLimit), [stepsResult, isExpanded, currentStepLimit]);
 
     if (!stepsResult) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '28px 14px', textAlign: 'center' }}>
-                <div style={{ fontSize: '36px' }}>🌳</div>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
-                    Run navigation to see the decision tree — each node shows the cost settled by the algorithm.
-                </p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '28px 14px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '32px', opacity: 0.7 }}>🌳</div>
+                <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.6 }}>Run navigation to see how the algorithm thinks. The decision tree will appear here!</p>
             </div>
         );
     }
@@ -121,8 +127,29 @@ export function DecisionTree() {
 
             <Legend />
 
+            {/* Expanded Math Tooltip Guide */}
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', margin: '-4px 0 2px' }}>
+                * Hover over node boxes to reveal the math formula.
+            </div>
+
+            {/* Tree Playback Controls */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, background: '#f8fafc', padding: '8px 10px', borderRadius: 8, border: '1px solid #dde5f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#4a5a70' }}>Step Playback</span>
+                    <span style={{ fontSize: '10px', color: 'var(--accent-blue)', fontWeight: 600 }}>{currentStepLimit} / {stepsResult.steps.length}</span>
+                </div>
+                <input
+                    type="range"
+                    min="1"
+                    max={stepsResult.steps.length}
+                    value={currentStepLimit}
+                    onChange={(e) => setCurrentStepLimit(Number(e.target.value))}
+                    style={{ cursor: 'pointer', width: '100%', accentColor: 'var(--accent-blue)' }}
+                />
+            </div>
+
             {/* Small inline Diagram */}
-            <div style={{ height: '240px', background: '#f8fafc', borderRadius: 10, border: '1px solid #dde5f0', overflow: 'hidden', position: 'relative' }}>
+            <div style={{ height: '200px', background: '#f8fafc', borderRadius: 10, border: '1px solid #dde5f0', overflow: 'hidden', position: 'relative' }}>
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}
@@ -139,18 +166,34 @@ export function DecisionTree() {
                 </ReactFlow>
             </div>
 
-            {/* Step log */}
-            <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {stepsResult.steps?.slice(0, 20).map((step) => (
-                    <div key={step.step} style={{
-                        fontSize: '11px', fontFamily: 'var(--font-mono)',
-                        color: '#4a5a70', padding: '4px 8px',
-                        background: '#f4f7fc', borderRadius: 5,
-                        borderLeft: '2.5px solid #5b9cf6', lineHeight: 1.4,
-                    }}>
-                        <span style={{ color: '#3a7dc8', fontWeight: 600 }}>#{step.step}</span> {step.description}
+            {/* Step log & Priority Queue */}
+            <div style={{ display: 'flex', gap: 8, height: '160px' }}>
+                {/* Step Log */}
+                <div className="custom-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, paddingRight: 4 }}>
+                    {stepsResult.steps?.slice(0, currentStepLimit).reverse().map((step) => (
+                        <div key={step.step} style={{
+                            fontSize: '11px', fontFamily: 'var(--font-mono)',
+                            color: '#4a5a70', padding: '6px 8px',
+                            background: '#f4f7fc', borderRadius: 6,
+                            borderLeft: '2.5px solid #5b9cf6', lineHeight: 1.4,
+                        }}>
+                            <span style={{ color: '#3a7dc8', fontWeight: 600 }}>#{step.step}</span> {step.description}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Priority Queue state for the current step */}
+                <div style={{ width: '100px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, borderLeft: '1px solid #dde5f0', paddingLeft: 8 }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#1a2a3a', textAlign: 'center', marginBottom: 2 }}>Evaluated👇</div>
+                    <div className="custom-scroll" style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {stepsResult.steps[currentStepLimit - 1]?.neighbors_updated?.map((nb, i) => (
+                            <div key={i} style={{ background: '#eafaf1', border: '1px solid #2ecc71', borderRadius: 4, padding: '4px', fontSize: '9px', textAlign: 'center', color: '#1e8449' }}>
+                                <div style={{ fontWeight: 600 }}>{NODES[nb.node]?.label || nb.node}</div>
+                                <div>{nb.f != null ? `f: ${nb.f}` : `d: ${nb.new_dist}`}</div>
+                            </div>
+                        ))}
                     </div>
-                ))}
+                </div>
             </div>
 
             {/* Expanded Modal Overlay */}

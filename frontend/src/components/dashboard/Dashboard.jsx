@@ -8,12 +8,13 @@ import { DeliveryList } from './DeliveryList';
 import { DecisionTree } from './DecisionTree';
 import { PlaybackControls } from '../controls/PlaybackControls';
 import useStore from '../../store/useStore';
+import { NODES } from '../../data/townGraph';
 
 const TABS = ['Route', 'Algorithm', 'Tree'];
 
 export function Dashboard() {
     const [activeTab, setActiveTab] = useState('Route');
-    const { showLabels, setShowLabels, cameraAngle, setCameraAngle, toggleDarkMode } = useStore();
+    const { showLabels, setShowLabels, cameraAngle, setCameraAngle, toggleDarkMode, destinations, routeResult } = useStore();
 
     return (
         <aside style={{
@@ -107,10 +108,27 @@ export function Dashboard() {
             {/* Tab content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {activeTab === 'Route' && (
-                    <>
-                        <RouteStats />
-                        <DeliveryList />
-                    </>
+                    destinations.length < 2 && !routeResult ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
+                            <div style={{ fontSize: '32px', opacity: 0.7 }}>📍</div>
+                            <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.6 }}>Click houses on the map to add delivery stops. Add at least 2 stops to see your route!</p>
+                            <button className="btn btn-primary" style={{ marginTop: 8, padding: '6px 16px', fontSize: '12px' }} onClick={() => {
+                                const arr = Object.keys(NODES).filter(k => NODES[k].type === 'address');
+                                const r1 = arr[Math.floor(Math.random() * arr.length)];
+                                let r2 = arr[Math.floor(Math.random() * arr.length)];
+                                while (r2 === r1) r2 = arr[Math.floor(Math.random() * arr.length)];
+                                useStore.getState().addDestination(r1);
+                                useStore.getState().addDestination(r2);
+                            }}>
+                                + Add 2 Random Stops
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <RouteStats />
+                            <DeliveryList />
+                        </>
+                    )
                 )}
                 {activeTab === 'Algorithm' && <AlgoInfo />}
                 {activeTab === 'Tree' && <DecisionTree />}
