@@ -1,12 +1,25 @@
 /**
- * TablesTab — Live-updating data structures for educational transparency.
- * Mirrors classic CS slides (distTo[], edgeTo[]) for algorithm visualization.
+ * TablesTab — Mission-control view of the algorithm's internal structures.
+ * Replaces dense HTML tables with a more visual layout:
+ * - Delivery manifest (stops + status)
+ * - Best-known costs + predecessor tree snapshot
+ * - Frontier (priority queue) as ranked cards
  */
+import { useMemo } from 'react';
 import useStore from '../../store/useStore';
-import { NODES, displayNodeName } from '../../data/townGraph';
+import { displayNodeName } from '../../data/townGraph';
 
 export function TablesTab() {
-    const { stepsResult, algorithm, currentStepIndex, learningMode } = useStore();
+    const {
+        stepsResult,
+        algorithm,
+        currentStepIndex,
+        learningMode,
+        destinations,
+        deliveredNodes,
+        currentSegment,
+        routeResult,
+    } = useStore();
 
     if (!stepsResult?.steps?.length) {
         return (
@@ -22,164 +35,347 @@ export function TablesTab() {
         );
     }
 
-    const stepsUpTo = stepsResult.steps.slice(0, currentStepIndex + 1);
-    const visitedOrder = [];
-    const distMap = {};
-    const hMap = {};
-    const fMap = {};
-    const edgeToMap = {};
-    const openSet = new Map();
+    const derived = useMemo(() => {
+        const stepsUpTo = stepsResult.steps.slice(0, currentStepIndex + 1);
+        const visitedOrder = [];
 
-    stepsUpTo.forEach((step, stepIdx) => {
-        const u = step.node;
-        if (!visitedOrder.includes(u)) visitedOrder.push(u);
-        openSet.delete(u);
+        const timeMap = {};
+        const rawMap = {};
+        const fuelMap = {};
+        const hMap = {};
+        const fMap = {};
+        const fFuelMap = {};
+        const edgeToMap = {};
+        const openSet = new Map();
 
-        if (step.distance != null) distMap[u] = step.distance;
-        if (step.heuristic != null) hMap[u] = step.heuristic;
-        if (step.f_score != null) fMap[u] = step.f_score;
+        const setBest = (map, key, val) => {
+            if (val == null) return;
+            if (map[key] == null || val < map[key]) map[key] = val;
+        };
 
-        step.neighbors_updated?.forEach(nb => {
-            const v = nb.node;
-            const score = nb.f ?? nb.new_dist ?? nb.g;
-            if (!visitedOrder.includes(v) || openSet.has(v)) {
+        for (let stepIdx = 0; stepIdx < stepsUpTo.length; stepIdx += 1) {
+            const step = stepsUpTo[stepIdx];
+            const u = step.node;
+            if (!visitedOrder.includes(u)) visitedOrder.push(u);
+            openSet.delete(u);
+
+            if (step.distance != null) timeMap[u] = step.distance;
+            if (step.raw_distance != null) rawMap[u] = step.raw_distance;
+            if (step.fuel_cost != null) fuelMap[u] = step.fuel_cost;
+            if (step.heuristic != null) hMap[u] = step.heuristic;
+            if (step.f_score != null) fMap[u] = step.f_score;
+            if (step.f_fuel != null) fFuelMap[u] = step.f_fuel;
+
+            const nbs = step.neighbors_updated || [];
+            for (const nb of nbs) {
+                const v = nb.node;
+                if (!v) continue;
+
+                const score = nb.f ?? nb.new_dist ?? nb.g ?? 0;
                 if (!openSet.has(v) || score < (openSet.get(v)?.score ?? Infinity)) {
-                    openSet.set(v, { score, label: NODES[v]?.label || v });
+                    openSet.set(v, { score, label: displayNodeName(v) });
+                }
+
+                if (nb.relaxed) {
+                    edgeToMap[v] = displayNodeName(nb.from_node ?? u);
+                    if (nb.new_dist != null) setBest(timeMap, v, nb.new_dist);
+                    if (nb.new_raw_dist != null) setBest(rawMap, v, nb.new_raw_dist);
+                    if (nb.new_fuel_cost != null) setBest(fuelMap, v, nb.new_fuel_cost);
+                    if (nb.h != null) hMap[v] = nb.h;
+                    if (nb.f != null) {
+                        if (algorithm === 'astar') fFuelMap[v] = nb.f;
+                        else fMap[v] = nb.f;
+                    }
                 }
             }
-            if (nb.new_dist != null && (distMap[v] === undefined || nb.new_dist < distMap[v])) {
-                distMap[v] = nb.new_dist;
-                const sourceLabel = displayNodeName(u);
-                edgeToMap[v] = sourceLabel;
+
+            // If the backend provides a queue snapshot (optional), prefer it for frontier order.
+            if (Array.isArray(step.queue) && step.queue.length > 0 && stepIdx === currentStepIndex) {
+                openSet.clear();
+                step.queue.forEach((item) => {
+                    const id = Array.isArray(item) ? item[0] : item;
+                    const score = Array.isArray(item) ? item[1] : timeMap[id];
+                    openSet.set(id, { score: score ?? 0, label: displayNodeName(id) });
+                });
             }
-        });
-
-        if (step.queue?.length > 0 && stepIdx === currentStepIndex) {
-            openSet.clear();
-            step.queue.forEach(item => {
-                const id = Array.isArray(item) ? item[0] : item;
-                const score = Array.isArray(item) ? item[1] : distMap[id];
-                openSet.set(id, { score: score ?? 0, label: NODES[id]?.label || id });
-            });
         }
-    });
 
-    const sortedOpenSet = [...openSet.entries()]
-        .sort((a, b) => (a[1].score ?? Infinity) - (b[1].score ?? Infinity));
+        const sortedOpenSet = [...openSet.entries()].sort((a, b) => (a[1].score ?? Infinity) - (b[1].score ?? Infinity));
+        const currentNode = stepsUpTo[stepsUpTo.length - 1]?.node;
+        return { stepsUpTo, visitedOrder, timeMap, rawMap, fuelMap, hMap, fMap, fFuelMap, edgeToMap, sortedOpenSet, currentNode };
+    }, [stepsResult, currentStepIndex, algorithm]);
 
     const isBeginner = learningMode === 'beginner';
     const isAstar = algorithm === 'astar';
-    const currentNode = stepsUpTo[stepsUpTo.length - 1]?.node;
 
-    const headerCellStyle = {
-        padding: '10px 12px', fontSize: '9px', fontWeight: 800, color: '#7a8aaa',
-        textTransform: 'uppercase', letterSpacing: '0.8px', borderBottom: '1px solid rgba(255,255,255,0.06)'
-    };
+    const fmt = (n, digits = 1, suffix = '') =>
+        typeof n === 'number' && Number.isFinite(n) ? `${n.toFixed(digits)}${suffix}` : '—';
 
-    const cellStyle = (right) => ({
-        padding: '10px 12px', fontSize: '11px', color: '#cbd5e1', textAlign: right ? 'right' : 'left'
-    });
+    const stops = ['warehouse', ...(destinations || [])];
+    const liveSeg = Math.min(Math.max(currentSegment || 0, 0), Math.max(stops.length - 2, 0));
+    const liveFrom = stops[liveSeg];
+    const liveTo = stops[liveSeg + 1];
 
     return (
-        <div className="custom-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: '4px', overflowY: 'auto', height: '100%', minHeight: 0 }}>
-
-            {/* Current Context Highlight */}
-            {currentNode && (
-                <div style={{
-                    background: 'rgba(99,120,255,0.05)',
-                    border: '1px solid rgba(99,120,255,0.15)',
-                    borderRadius: 12, padding: '16px', display: 'flex', alignItems: 'center', gap: 14
-                }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#8090ff', boxShadow: '0 0 10px #8090ff' }} />
-                    <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: '9px', color: '#8090ff', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 800 }}>Extracting Vertex</p>
-                        <p style={{ margin: '4px 0 0', fontSize: '15px', color: '#eef2fb', fontWeight: 700 }}>{displayNodeName(currentNode)}</p>
+        <div className="custom-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 6, overflowY: 'auto', height: '100%', minHeight: 0 }}>
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    padding: '14px 14px',
+                    borderRadius: 16,
+                    border: '1px solid rgba(148,163,184,0.14)',
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+                }}
+            >
+                <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: '#9fc7ff', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        Mission Control
                     </div>
-                    {!isBeginner && (
-                        <div style={{ textAlign: 'right' }}>
-                            <p style={{ margin: 0, fontSize: '9px', color: '#556080', fontWeight: 800 }}>CURRENT COST</p>
-                            <p style={{ margin: '2px 0 0', fontSize: '15px', color: '#eef2fb', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{distMap[currentNode]?.toFixed(2)}s</p>
+                    <div style={{ marginTop: 4, fontSize: 13, fontWeight: 850, color: '#eef2ff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {displayNodeName(liveFrom)} → {displayNodeName(liveTo)}
+                    </div>
+                    {derived.currentNode && (
+                        <div style={{ marginTop: 6, fontSize: 11, color: '#93a6c3' }}>
+                            Focus: <span style={{ color: '#dbeafe', fontWeight: 850 }}>{displayNodeName(derived.currentNode)}</span>
                         </div>
                     )}
                 </div>
-            )}
-
-            {/* Beginner View: Simplified Summary */}
-            {isBeginner && (
-                <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <h3 style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: '#eef2fb' }}>Algorithm Progress</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <span style={{ fontSize: '11px', color: '#7a8aaa' }}>Visited Intersections</span>
-                            <span style={{ fontSize: '11px', color: '#eef2fb', fontWeight: 700 }}>{visitedOrder.length} nodes</span>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexShrink: 0 }}>
+                    <div style={{ padding: '10px 12px', borderRadius: 14, border: '1px solid rgba(34,211,238,0.18)', background: 'rgba(34,211,238,0.06)', minWidth: 120 }}>
+                        <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Steps</div>
+                        <div style={{ marginTop: 5, fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 850, color: '#d6f9ff' }}>
+                            {currentStepIndex + 1} / {stepsResult.steps.length}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <span style={{ fontSize: '11px', color: '#7a8aaa' }}>Locations to explore</span>
-                            <span style={{ fontSize: '11px', color: '#fbbf24', fontWeight: 700 }}>{sortedOpenSet.length} nearby</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
-                            <span style={{ fontSize: '11px', color: '#7a8aaa' }}>Total Simulation Time</span>
-                            <span style={{ fontSize: '11px', color: '#8090ff', fontWeight: 700 }}>{distMap[currentNode]?.toFixed(1)} seconds</span>
+                    </div>
+                    <div style={{ padding: '10px 12px', borderRadius: 14, border: '1px solid rgba(251,191,36,0.18)', background: 'rgba(251,191,36,0.06)', minWidth: 120 }}>
+                        <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Frontier</div>
+                        <div style={{ marginTop: 5, fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 850, color: '#fde68a' }}>
+                            {derived.sortedOpenSet.length}
                         </div>
                     </div>
                 </div>
-            )}
+            </div>
 
-            {/* Intermediate/Advanced View: Formal Tables */}
-            {!isBeginner && (
-                <>
-                    <section style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                            <h3 style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: '#eef2fb', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Shortest-Path Tree (SPT) Snapshot</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: isBeginner ? '1fr' : '1.05fr 1.25fr', gap: 12, minHeight: 0 }}>
+                <section
+                    style={{
+                        borderRadius: 16,
+                        border: '1px solid rgba(148,163,184,0.14)',
+                        background: 'linear-gradient(180deg, rgba(14,22,36,0.92), rgba(9,15,26,0.88))',
+                        overflow: 'hidden',
+                        minHeight: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}
+                >
+                    <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(148,163,184,0.12)' }}>
+                        <div style={{ fontSize: 10, fontWeight: 900, color: '#eef2ff', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                            Delivery Manifest
                         </div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr>
-                                    <th style={headerCellStyle}>Vertex (v)</th>
-                                    <th style={{ ...headerCellStyle, textAlign: 'right' }}>distTo[v]</th>
-                                    <th style={{ ...headerCellStyle, textAlign: 'center' }}>edgeTo[v]</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {visitedOrder.map((id, i) => {
-                                    const isLatest = i === visitedOrder.length - 1;
+                        <div style={{ marginTop: 4, fontSize: 11, color: '#7f93b2' }}>
+                            Stops, delivery status, and what the algorithm is optimizing.
+                        </div>
+                    </div>
+                    <div className="custom-scroll" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
+                        {stops.map((id, idx) => {
+                            const isWarehouse = idx === 0;
+                            const isDelivered = !isWarehouse && deliveredNodes.includes(id);
+                            const isNext = !isWarehouse && idx === (currentSegment || 0) + 1;
+                            return (
+                                <div
+                                    key={id + idx}
+                                    style={{
+                                        borderRadius: 14,
+                                        padding: '10px 12px',
+                                        border: `1px solid ${isNext ? 'rgba(34,211,238,0.22)' : 'rgba(148,163,184,0.12)'}`,
+                                        background: isNext ? 'rgba(34,211,238,0.06)' : 'rgba(255,255,255,0.03)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 10,
+                                    }}
+                                >
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                            {isWarehouse ? 'Origin' : `Stop ${idx}`}
+                                        </div>
+                                        <div style={{ marginTop: 4, fontSize: 12, fontWeight: 850, color: '#eef2ff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {displayNodeName(id)}
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                        {isDelivered ? (
+                                            <span style={{ fontSize: 11, fontWeight: 900, color: '#86efac' }}>Delivered</span>
+                                        ) : isNext ? (
+                                            <span style={{ fontSize: 11, fontWeight: 900, color: '#67e8f9' }}>In Progress</span>
+                                        ) : (
+                                            <span style={{ fontSize: 11, fontWeight: 900, color: '#93a6c3' }}>Queued</span>
+                                        )}
+                                        <div style={{ width: 10, height: 10, borderRadius: 999, background: isDelivered ? '#22c55e' : isNext ? '#22d3ee' : '#475569' }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        <div style={{ marginTop: 4, padding: '10px 12px', borderRadius: 14, border: '1px solid rgba(148,163,184,0.12)', background: 'rgba(255,255,255,0.02)' }}>
+                            <div style={{ fontSize: 10, fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                Optimization Target
+                            </div>
+                            <div style={{ marginTop: 6, fontSize: 12, color: '#dbeafe', fontWeight: 850 }}>
+                                {algorithm === 'astar' ? 'Fuel (with slope)' : 'Time (fastest ETA)'}
+                            </div>
+                            <div style={{ marginTop: 6, fontSize: 11, color: '#7f93b2', lineHeight: 1.5 }}>
+                                {algorithm === 'astar'
+                                    ? 'A* minimizes a fuel proxy: distance plus uphill penalty (downhill saves a bit).'
+                                    : 'Dijkstra / Bellman-Ford minimize total transit time using speed limits (main roads are faster).'
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {!isBeginner && (
+                    <section style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+                        <div
+                            style={{
+                                borderRadius: 16,
+                                border: '1px solid rgba(148,163,184,0.14)',
+                                background: 'linear-gradient(180deg, rgba(14,22,36,0.92), rgba(9,15,26,0.88))',
+                                overflow: 'hidden',
+                                minHeight: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                            }}
+                        >
+                            <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(148,163,184,0.12)' }}>
+                                <div style={{ fontSize: 10, fontWeight: 900, color: '#eef2ff', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                    Best-Known Costs (distTo / edgeTo)
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 11, color: '#7f93b2' }}>
+                                    Snapshot of what the algorithm currently believes is optimal so far.
+                                </div>
+                            </div>
+
+                            <div className="custom-scroll" style={{ overflowY: 'auto' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: isAstar ? '1.35fr 0.8fr 0.8fr 0.8fr 1fr' : '1.6fr 1fr 1fr 1fr', gap: 0, padding: '10px 12px', borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
+                                    <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vertex</div>
+                                    {isAstar ? (
+                                        <>
+                                            <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Time</div>
+                                            <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Dist</div>
+                                            <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Fuel</div>
+                                            <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>edgeTo</div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Time</div>
+                                            <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Dist</div>
+                                            <div style={{ fontSize: 9, fontWeight: 900, color: '#7f93b2', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>edgeTo</div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {derived.visitedOrder.map((id, idx) => {
+                                    const isLatest = idx === derived.visitedOrder.length - 1;
                                     return (
-                                        <tr key={id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: isLatest ? 'rgba(128,144,255,0.05)' : 'transparent' }}>
-                                            <td style={{ ...cellStyle(), fontWeight: 700, color: isLatest ? '#8090ff' : '#cbd5e1' }}>{displayNodeName(id)}</td>
-                                            <td style={{ ...cellStyle(true), fontFamily: 'var(--font-mono)' }}>{distMap[id]?.toFixed(1) ?? '∞'}s</td>
-                                            <td style={{ ...cellStyle(), textAlign: 'center', color: '#556080', fontSize: '10px' }}>{i === 0 ? 'START' : edgeToMap[id]}</td>
-                                        </tr>
+                                        <div
+                                            key={id}
+                                            style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: isAstar ? '1.35fr 0.8fr 0.8fr 0.8fr 1fr' : '1.6fr 1fr 1fr 1fr',
+                                                padding: '10px 12px',
+                                                borderBottom: '1px solid rgba(148,163,184,0.06)',
+                                                background: isLatest ? 'rgba(34,211,238,0.06)' : 'transparent',
+                                                gap: 0,
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <div style={{ minWidth: 0, fontWeight: 850, color: isLatest ? '#67e8f9' : '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {displayNodeName(id)}
+                                            </div>
+                                            {isAstar ? (
+                                                <>
+                                                    <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: '#cbd5e1' }}>{fmt(derived.timeMap[id], 1, 's')}</div>
+                                                    <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: '#cbd5e1' }}>{fmt(derived.rawMap[id], 1, 'u')}</div>
+                                                    <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: '#fde68a' }}>{fmt(derived.fuelMap[id], 1, '')}</div>
+                                                    <div style={{ textAlign: 'right', fontSize: 11, color: '#93a6c3' }}>{idx === 0 ? 'START' : (derived.edgeToMap[id] || '—')}</div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: '#cbd5e1' }}>{fmt(derived.timeMap[id], 1, 's')}</div>
+                                                    <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: '#cbd5e1' }}>{fmt(derived.rawMap[id], 1, 'u')}</div>
+                                                    <div style={{ textAlign: 'right', fontSize: 11, color: '#93a6c3' }}>{idx === 0 ? 'START' : (derived.edgeToMap[id] || '—')}</div>
+                                                </>
+                                            )}
+                                        </div>
                                     );
                                 })}
-                            </tbody>
-                        </table>
-                    </section>
-
-                    <section style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                            <h3 style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Priority Queue (Open Set)</h3>
+                            </div>
                         </div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr>
-                                    <th style={headerCellStyle}>Rank</th>
-                                    <th style={headerCellStyle}>Node</th>
-                                    <th style={{ ...headerCellStyle, textAlign: 'right' }}>Score</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedOpenSet.slice(0, 10).map(([nodeId, info], i) => (
-                                    <tr key={nodeId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: i === 0 ? 'rgba(251,191,36,0.05)' : 'transparent' }}>
-                                        <td style={{ ...cellStyle(), color: i === 0 ? '#fbbf24' : '#556080', fontSize: '10px', fontWeight: 800 }}>{i === 0 ? 'NEXT' : `#${i + 1}`}</td>
-                                        <td style={cellStyle()}>{info.label}</td>
-                                        <td style={{ ...cellStyle(true), fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{info.score?.toFixed(1)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+
+                        <div
+                            style={{
+                                borderRadius: 16,
+                                border: '1px solid rgba(148,163,184,0.14)',
+                                background: 'linear-gradient(180deg, rgba(14,22,36,0.92), rgba(9,15,26,0.88))',
+                                overflow: 'hidden',
+                            }}
+                        >
+                            <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(148,163,184,0.12)' }}>
+                                <div style={{ fontSize: 10, fontWeight: 900, color: '#fbbf24', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                    Frontier (Priority Queue)
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 11, color: '#7f93b2' }}>
+                                    Next candidates ranked by priority. Top card is the likely next expansion.
+                                </div>
+                            </div>
+                            <div style={{ padding: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+                                {derived.sortedOpenSet.slice(0, 8).map(([nodeId, info], i) => {
+                                    const isNext = i === 0;
+                                    return (
+                                        <div
+                                            key={nodeId}
+                                            style={{
+                                                borderRadius: 16,
+                                                padding: '12px 12px',
+                                                border: `1px solid ${isNext ? 'rgba(251,191,36,0.30)' : 'rgba(148,163,184,0.12)'}`,
+                                                background: isNext ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)',
+                                                boxShadow: isNext ? '0 18px 40px rgba(251,191,36,0.12)' : 'none',
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                                                <div style={{ fontSize: 10, fontWeight: 900, color: isNext ? '#fbbf24' : '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                                    {isNext ? 'Next' : `#${i + 1}`}
+                                                </div>
+                                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 850, color: '#e2e8f0' }}>
+                                                    {fmt(info.score, 1)}
+                                                </div>
+                                            </div>
+                                            <div style={{ marginTop: 6, fontSize: 12, fontWeight: 850, color: '#eef2ff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {info.label}
+                                            </div>
+                                            <div style={{ marginTop: 8, height: 6, borderRadius: 999, background: 'rgba(148,163,184,0.12)', overflow: 'hidden' }}>
+                                                <div style={{
+                                                    width: `${Math.max(10, 100 - i * 11)}%`,
+                                                    height: '100%',
+                                                    background: isNext ? 'linear-gradient(90deg, rgba(251,191,36,0.9), rgba(34,211,238,0.6))' : 'linear-gradient(90deg, rgba(148,163,184,0.45), rgba(148,163,184,0.12))',
+                                                }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {derived.sortedOpenSet.length === 0 && (
+                                    <div style={{ padding: 14, fontSize: 12, color: '#7f93b2' }}>Frontier is empty for this step.</div>
+                                )}
+                            </div>
+                        </div>
                     </section>
-                </>
-            )}
+                )}
+            </div>
         </div>
     );
 }
+

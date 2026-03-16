@@ -14,6 +14,7 @@ import { TheoryOverlay } from './TheoryOverlay';
 import { TablesTab } from './TablesTab';
 import useStore from '../../store/useStore';
 import { NODES } from '../../data/townGraph';
+import { displayNodeName } from '../../data/townGraph';
 
 const TABS = ['configuration', 'theory', 'tables'];
 const TAB_LABELS = {
@@ -30,7 +31,9 @@ export function LearningWorkspace() {
         cameraAngle, setCameraAngle,
         destinations, routeResult,
         stepsResult,
-        learningMode, setLearningMode
+        learningMode, setLearningMode,
+        currentSegment,
+        deliveredNodes,
     } = useStore();
 
     useEffect(() => {
@@ -238,6 +241,36 @@ export function LearningWorkspace() {
                                                             Open Details
                                                         </button>
                                                     </div>
+                                                    {destinations?.length > 0 && (
+                                                        <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                                            {['warehouse', ...destinations].map((id, i) => {
+                                                                const isWarehouse = i === 0;
+                                                                const isDelivered = !isWarehouse && deliveredNodes?.includes(id);
+                                                                const isActive = i === (currentSegment || 0) + 1 || (isWarehouse && (currentSegment || 0) === 0);
+                                                                return (
+                                                                    <div
+                                                                        key={id + i}
+                                                                        style={{
+                                                                            padding: '7px 10px',
+                                                                            borderRadius: 999,
+                                                                            border: `1px solid ${isActive ? 'rgba(34,211,238,0.25)' : 'rgba(148,163,184,0.14)'}`,
+                                                                            background: isActive ? 'rgba(34,211,238,0.06)' : 'rgba(255,255,255,0.03)',
+                                                                            color: isDelivered ? '#86efac' : '#d6e4ff',
+                                                                            fontSize: 11,
+                                                                            fontWeight: 850,
+                                                                            maxWidth: 220,
+                                                                            whiteSpace: 'nowrap',
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                        }}
+                                                                        title={displayNodeName(id)}
+                                                                    >
+                                                                        {i === 0 ? 'Warehouse' : `Stop ${i}`}: {displayNodeName(id)}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {!stepsResult && (
