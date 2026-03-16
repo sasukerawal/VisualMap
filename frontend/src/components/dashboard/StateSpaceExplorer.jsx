@@ -44,17 +44,77 @@ function MapDotNode({ data }) {
     const ring = isActive ? '0 0 0 6px rgba(251,191,36,0.16), 0 0 18px rgba(251,191,36,0.22)' : 'none';
 
     return (
-        <div
-            style={{
-                width: 8,
-                height: 8,
-                borderRadius: 999,
-                background: bg,
-                boxShadow: ring,
-                border: '1px solid rgba(15,23,42,0.55)',
-                opacity: data?.opacity ?? 1,
-            }}
-        />
+        <div style={{ position: 'relative' }}>
+            {data?.callout && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: 12,
+                        top: -10,
+                        transform: 'translateY(-100%)',
+                        width: 320,
+                        maxWidth: 360,
+                        background: 'rgba(10,14,24,0.92)',
+                        border: '1px solid rgba(148,163,184,0.22)',
+                        borderRadius: 14,
+                        padding: '10px 12px',
+                        color: '#e5eefc',
+                        boxShadow: '0 24px 50px rgba(0,0,0,0.35)',
+                        backdropFilter: 'blur(10px)',
+                        pointerEvents: 'none',
+                        zIndex: 3,
+                    }}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9fb0ca' }}>
+                            Current Decision
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 900, color: '#fbbf24' }}>{data.callout.nodeLabel}</div>
+                    </div>
+                    {data.callout.summary && (
+                        <div style={{ marginTop: 6, fontSize: 12, fontWeight: 800, color: '#dbeafe' }}>
+                            {data.callout.summary}
+                        </div>
+                    )}
+                    {data.callout.reason && (
+                        <div style={{ marginTop: 6, fontSize: 11, color: '#b7c7e6', lineHeight: 1.35 }}>
+                            {data.callout.reason}
+                        </div>
+                    )}
+                    {Array.isArray(data.callout.neighbors) && data.callout.neighbors.length > 0 && (
+                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {data.callout.neighbors.slice(0, 5).map((nb) => (
+                                <div key={nb.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '6px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(148,163,184,0.12)' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <div style={{ fontSize: 11, fontWeight: 850, color: nb.relaxed ? '#86efac' : '#cbd5e1' }}>{nb.label}</div>
+                                        <div style={{ fontSize: 10, color: '#8ea3c2' }}>{nb.note}</div>
+                                    </div>
+                                    <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 10, color: '#cbd5e1' }}>
+                                        <div>+{nb.edgeTime} s</div>
+                                        <div>+{nb.edgeDist} u</div>
+                                    </div>
+                                </div>
+                            ))}
+                            {data.callout.neighbors.length > 5 && (
+                                <div style={{ fontSize: 10, color: '#7a8aaa' }}>…and {data.callout.neighbors.length - 5} more neighbors</div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            <div
+                style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    background: bg,
+                    boxShadow: ring,
+                    border: '1px solid rgba(15,23,42,0.55)',
+                    opacity: data?.opacity ?? 1,
+                }}
+            />
+        </div>
     );
 }
 
@@ -237,7 +297,7 @@ function buildFlowGraph(stepsResult, currentStepIndex, learningMode, destination
     return { nodes: rfNodes, edges: rfEdges };
 }
 
-function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, selectedOnly) {
+function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, selectedOnly, algorithm) {
     const hasSteps = !!stepsResult?.steps?.length;
     const safeIndex = hasSteps ? Math.min(Math.max(currentStepIndex || 0, 0), stepsResult.steps.length - 1) : 0;
 
@@ -271,6 +331,46 @@ function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult,
     }
 
     const selectedSet = new Set([...(destinations || []), 'warehouse']);
+
+    const fmt = (n, digits = 2) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(digits) : '—');
+    const activeCallout = (() => {
+        if (!activeStep?.node) return null;
+        const nodeLabel = displayNodeName(activeStep.node);
+        const g = fmt(activeStep.distance);
+        const raw = fmt(activeStep.raw_distance);
+        const h = fmt(activeStep.heuristic);
+        const f = fmt(activeStep.f_score);
+
+        let summary = `g(time)=${g}s`;
+        if (raw !== '—') summary += `, dist=${raw}u`;
+        if (h !== '—') summary += `, h=${h}`;
+        if (f !== '—') summary += `, f=${f}`;
+
+        const reason = activeStep.explanation || activeStep.description || `Expanded next node with the best priority (${(algorithm || '').toUpperCase() || 'ALGO'}).`;
+
+        const neighbors = (activeStep.neighbors_updated || []).map((nb) => {
+            const label = displayNodeName(nb.node);
+            const edgeTime = fmt(nb.edge_time_cost);
+            const edgeDist = fmt(nb.edge_distance);
+            const newTime = fmt(nb.new_dist ?? nb.g);
+            const newRaw = fmt(nb.new_raw_dist);
+
+            const note = nb.relaxed
+                ? `Updated best time to ${newTime}s${newRaw !== '—' ? ` (dist ${newRaw}u)` : ''}`
+                : `Kept existing best (candidate not improved)`;
+
+            return {
+                id: nb.node,
+                label,
+                relaxed: !!nb.relaxed,
+                edgeTime,
+                edgeDist,
+                note,
+            };
+        });
+
+        return { nodeLabel, summary, reason, neighbors };
+    })();
 
     const scale = 14;
     const rfNodes = Object.entries(NODES).map(([id, def]) => {
@@ -326,7 +426,7 @@ function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult,
             id,
             type: 'mapDot',
             position: { x, y },
-            data: { state },
+            data: { state, callout: id === activeNodeId ? activeCallout : null },
             draggable: false,
             selectable: false,
         };
@@ -528,8 +628,8 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
     const hasSteps = !!stepsResult?.steps?.length;
 
     const { nodes: mapNodes, edges: mapEdges } = useMemo(() =>
-        buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, hasSteps),
-        [stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, hasSteps]
+        buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, hasSteps, algorithm),
+        [stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, hasSteps, algorithm]
     );
 
     // In Dashboard Mode, we just return the FlowView directly within its provider
