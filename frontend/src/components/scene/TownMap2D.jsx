@@ -31,7 +31,14 @@ function CameraAndControls({ controlsRef }) {
         camera.zoom = DEFAULT_ZOOM;
         camera.near = 0.1;
         camera.far = 500;
+        camera.lookAt(DEFAULT_TARGET);
         camera.updateProjectionMatrix();
+
+        // Ensure controls start centered on the town.
+        const controls = controlsRef.current;
+        if (controls?.target) controls.target.copy(DEFAULT_TARGET);
+        controls?.update?.();
+        controls?.saveState?.();
     }, [camera]);
 
     return (
@@ -370,6 +377,7 @@ export const TownMap2D = forwardRef(function TownMap2D({ selectedOnly = true }, 
                 camera={{ zoom: DEFAULT_ZOOM, position: [0, 80, 0.01], near: 0.1, far: 500 }}
                 gl={{ antialias: true, failIfMajorPerformanceCaveat: false, powerPreference: 'high-performance' }}
             >
+                <color attach="background" args={['#0b0e14']} />
                 <CameraAndControls controlsRef={controlsRef} />
                 <Scene2D selectedOnly={selectedOnly} />
             </Canvas>
