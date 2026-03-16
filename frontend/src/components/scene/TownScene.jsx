@@ -138,8 +138,9 @@ function SceneContent() {
         const pos = geo.attributes.position;
         const colors = new Float32Array(pos.count * 3);
 
-        // Keep amplitude subtle so roads/houses still read well.
-        const amp = 0.10;
+        // Stronger amplitude so the hill is obvious in screenshots.
+        // Roads/houses still sit on the "town plane" (y=0), so keep this moderate.
+        const amp = 0.22;
         for (let i = 0; i < pos.count; i++) {
             const x = pos.getX(i);
             const z = pos.getZ(i);
@@ -149,7 +150,7 @@ function SceneContent() {
 
             // Colorize: low -> cooler, high -> warmer
             const t = Math.max(0, Math.min(1, (y / (amp * 3.0) + 0.5)));
-            const c = new THREE.Color().setHSL(0.28 - t * 0.10, 0.35, 0.20 + t * 0.12);
+            const c = new THREE.Color().setHSL(0.30 - t * 0.12, 0.45, 0.18 + t * 0.18);
             colors[i * 3 + 0] = c.r;
             colors[i * 3 + 1] = c.g;
             colors[i * 3 + 2] = c.b;

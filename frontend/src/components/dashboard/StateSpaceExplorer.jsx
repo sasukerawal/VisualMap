@@ -456,9 +456,17 @@ function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult,
             type: isActive ? 'pulse' : 'straight',
             animated: isTimelinePlaying && isActive,
             style: {
-                stroke: isFinal ? '#3b82f6' : isActive ? '#fbbf24' : isMain ? 'rgba(148,163,184,0.35)' : isAlley ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.26)',
-                strokeWidth: isFinal ? 4.5 : isActive ? 2.5 : isMain ? 2 : 1.3,
-                opacity: isFinal ? 1 : isActive ? 0.95 : 0.7,
+                stroke: isFinal
+                    ? '#3b82f6'
+                    : isActive
+                        ? '#fbbf24'
+                        : isMain
+                            ? 'rgba(203,213,225,0.72)'
+                            : isAlley
+                                ? 'rgba(148,163,184,0.50)'
+                                : 'rgba(186,201,222,0.62)',
+                strokeWidth: isFinal ? 5.5 : isActive ? 3.2 : isMain ? 3.2 : isAlley ? 2.2 : 2.6,
+                opacity: isFinal ? 1 : isActive ? 0.98 : 0.92,
                 filter: isFinal ? 'drop-shadow(0 0 10px rgba(59,130,246,0.45))' : 'none',
             },
         };
@@ -602,6 +610,7 @@ function MapFlowView({ nodes, edges, onClose, internalHeader = true, dashboardMo
                     nodesConnectable={false}
                     elementsSelectable={false}
                     panOnScroll
+                    onlyRenderVisibleElements={false}
                     proOptions={{ hideAttribution: true }}
                     minZoom={0.05}
                 >

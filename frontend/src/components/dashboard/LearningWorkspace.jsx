@@ -34,6 +34,10 @@ export function LearningWorkspace() {
         learningMode, setLearningMode,
         currentSegment,
         deliveredNodes,
+        currentStepIndex,
+        setCurrentStepIndex,
+        isTimelinePlaying,
+        isTimelinePaused,
     } = useStore();
 
     useEffect(() => {
@@ -271,6 +275,43 @@ export function LearningWorkspace() {
                                                             })}
                                                         </div>
                                                     )}
+
+                                                    {stepsResult?.steps?.length ? (
+                                                        <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 14, border: '1px solid rgba(148,163,184,0.14)', background: 'rgba(255,255,255,0.02)' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                                                                <div style={{ fontSize: 10, fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                                                    Search Progress
+                                                                </div>
+                                                                <div style={{ fontSize: 12, fontWeight: 900, color: '#eef2ff' }}>
+                                                                    Consideration {currentStepIndex + 1} / {stepsResult.steps.length}
+                                                                </div>
+                                                            </div>
+                                                            <input
+                                                                type="range"
+                                                                min="0"
+                                                                max={Math.max(0, stepsResult.steps.length - 1)}
+                                                                value={currentStepIndex}
+                                                                onChange={(e) => setCurrentStepIndex(Number(e.target.value))}
+                                                                style={{ marginTop: 10, cursor: 'pointer', width: '100%', accentColor: '#35d7e8', height: '6px' }}
+                                                            />
+                                                            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                                                                <button
+                                                                    onClick={() => (isTimelinePlaying && !isTimelinePaused ? useStore.getState().pauseSimulation() : useStore.getState().runSimulation())}
+                                                                    className="btn"
+                                                                    style={{ flex: 1, borderRadius: 12, fontWeight: 900, background: 'linear-gradient(135deg, rgba(34,211,238,0.18), rgba(91,156,246,0.14))', border: '1px solid rgba(34,211,238,0.22)', color: '#d6f9ff' }}
+                                                                >
+                                                                    {isTimelinePlaying && !isTimelinePaused ? 'Pause Timeline' : 'Play Timeline'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => useStore.getState().resetSimulation()}
+                                                                    className="btn"
+                                                                    style={{ borderRadius: 12, fontWeight: 900, background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.22)', color: '#fca5a5' }}
+                                                                >
+                                                                    Reset
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
                                                 </div>
 
                                                 {!stepsResult && (
