@@ -206,6 +206,8 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
         </div>
     );
 
+    const shouldRenderInlineMap = !isExpanded;
+
     const content = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, height: '100%', minHeight: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -242,7 +244,17 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
                 </div>
             </div>
 
-            {mapCard}
+            {shouldRenderInlineMap ? mapCard : (
+                <div
+                    style={{
+                        flex: 1,
+                        minHeight: '120px',
+                        background: 'rgba(0,0,0,0.28)',
+                        borderRadius: 14,
+                        border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                />
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -434,4 +446,3 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
         </>
     );
 }
-
