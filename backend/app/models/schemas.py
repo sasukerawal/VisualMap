@@ -27,6 +27,10 @@ class PathRequest(BaseModel):
         default="optimized",
         description="'manual' respects the given order; 'optimized' uses nearest-neighbor TSP"
     )
+    segment_index: Optional[int] = Field(
+        default=None,
+        description="Optional segment index for step-by-step trace: 0=warehouse→dest[0], 1=dest[0]→dest[1], ..."
+    )
 
 
 # ---------------------------------------------------------------------------

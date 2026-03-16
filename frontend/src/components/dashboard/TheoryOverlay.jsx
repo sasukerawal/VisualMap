@@ -2,6 +2,8 @@ import useStore from '../../store/useStore';
 import ReasoningPanel from './ReasoningPanel';
 import PseudocodeViewer from './PseudocodeViewer';
 import { StateVariablesPanel } from './StateVariablesPanel';
+import { computePathSteps } from '../../api/pathfinding';
+import { displayNodeName } from '../../data/townGraph';
 
 const shellStyle = {
     height: '100%',
@@ -110,17 +112,116 @@ export function TheoryOverlay() {
         stepsResult,
         currentStepIndex,
         setCurrentStepIndex,
+        destinations,
+        orderMode,
+        routeResult,
+        currentSegment,
+        setStepsResult,
     } = useStore();
 
-    if (!stepsResult?.steps?.length) {
+    if (!routeResult || !destinations?.length) {
         return <EmptyTheoryState />;
     }
 
+    const hasSteps = !!stepsResult?.steps?.length;
+    if (!hasSteps) {
+        return <EmptyTheoryState />;
+    }
     const currentStep = stepsResult.steps[currentStepIndex] || stepsResult.steps[0];
     const algorithmLabel = algorithm === 'astar' ? 'A* Search' : algorithm === 'bellman_ford' ? 'Bellman-Ford' : "Dijkstra's";
 
+    const stops = ['warehouse', ...(destinations || [])];
+    const activeSegIndex = Math.min(Math.max(currentSegment || 0, 0), Math.max(stops.length - 2, 0));
+    const segFrom = stops[activeSegIndex];
+    const segTo = stops[activeSegIndex + 1];
+
+    async function loadSegment(segIndex) {
+        if (!destinations?.length) return;
+        const idx = Math.min(Math.max(segIndex, 0), Math.max(destinations.length - 1, 0));
+        try {
+            const res = await computePathSteps({
+                algorithm,
+                start: 'warehouse',
+                destinations,
+                orderMode,
+                segmentIndex: idx,
+            });
+            setStepsResult(res);
+            setCurrentStepIndex(0);
+            useStore.getState().resetSimulation();
+        } catch (e) {
+            console.warn('Failed to load steps for segment', idx, e);
+        }
+    }
+
     return (
         <div style={shellStyle}>
+            <div
+                style={{
+                    padding: '12px 14px',
+                    borderRadius: 18,
+                    border: '1px solid rgba(148,163,184,0.14)',
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+                    flexShrink: 0,
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                    <div>
+                        <div style={{ fontSize: 10, fontWeight: 900, color: '#9fc7ff', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                            Stop Progression
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#cbd5e1', fontWeight: 800 }}>
+                            {displayNodeName(segFrom)} → {displayNodeName(segTo)}
+                        </div>
+                    </div>
+                    <button
+                        className="btn btn-ghost"
+                        onClick={() => loadSegment(activeSegIndex)}
+                        style={{ borderRadius: 14, padding: '10px 12px', fontWeight: 850 }}
+                        title="Reload step trace for the current live stop-to-stop segment"
+                    >
+                        Follow Live
+                    </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {stops.map((id, i) => {
+                        const isStop = i > 0;
+                        const isDelivered = isStop && i <= (currentSegment || 0);
+                        const isActive = i === activeSegIndex || i === activeSegIndex + 1;
+                        return (
+                            <button
+                                key={id + i}
+                                onClick={() => {
+                                    // segments are between stops: clicking stop i loads segment i (warehouse->dest0 is 0)
+                                    if (i === 0) loadSegment(0);
+                                    else loadSegment(i - 1);
+                                }}
+                                style={{
+                                    cursor: 'pointer',
+                                    borderRadius: 999,
+                                    padding: '8px 10px',
+                                    border: `1px solid ${isActive ? 'rgba(34,211,238,0.35)' : 'rgba(148,163,184,0.14)'}`,
+                                    background: isActive
+                                        ? 'linear-gradient(135deg, rgba(34,211,238,0.12), rgba(91,156,246,0.10))'
+                                        : 'rgba(255,255,255,0.03)',
+                                    color: isDelivered ? '#86efac' : '#d6e4ff',
+                                    fontSize: 11,
+                                    fontWeight: 850,
+                                    maxWidth: 220,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                }}
+                                title={displayNodeName(id)}
+                            >
+                                {i === 0 ? 'Warehouse' : `Stop ${i}`}: {displayNodeName(id)}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
             <div
                 style={{
                     display: 'grid',

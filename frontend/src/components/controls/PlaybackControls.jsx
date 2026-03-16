@@ -11,6 +11,7 @@ export function PlaybackControls() {
         isPaused,
         animationSpeed,
         routeResult,
+        currentSegment,
         isLoading,
         error,
         setIsPlaying,
@@ -23,6 +24,7 @@ export function PlaybackControls() {
         setExploredNodes,
         setExploredEdges,
         setCurrentStepIndex,
+        setCurrentSegment,
         resetAnimation,
         resetAll,
     } = useStore();
@@ -31,12 +33,51 @@ export function PlaybackControls() {
     const explorationSteps = useRef([]);
     const stepIndex = useRef(0);
     const pausedRef = useRef(isPaused);
+    const lastLoadedSegment = useRef(null);
 
     useEffect(() => {
         pausedRef.current = isPaused;
     }, [isPaused]);
 
     useEffect(() => () => stopExploration(), []);
+
+    useEffect(() => {
+        // Auto-load the step trace for the currently active delivery segment (stop-to-stop).
+        // currentSegment is "delivered count", so segment_index == currentSegment yields:
+        // 0: warehouse->dest[0], 1: dest[0]->dest[1], etc.
+        if (!isPlaying || !routeResult || !destinations?.length) return;
+        if (currentSegment == null) return;
+        if (currentSegment >= destinations.length) return; // completed
+
+        if (lastLoadedSegment.current === currentSegment) return;
+        lastLoadedSegment.current = currentSegment;
+
+        (async () => {
+            try {
+                const stepsRes = await computePathSteps({
+                    algorithm,
+                    start: 'warehouse',
+                    destinations,
+                    orderMode,
+                    segmentIndex: currentSegment,
+                });
+
+                setStepsResult(stepsRes);
+                setCurrentStepIndex(0);
+                useStore.getState().resetSimulation();
+
+                // Highlight exploration edges for just this segment (keeps visuals aligned with the stop the user is on).
+                const segPath = routeResult?.segments?.[currentSegment]?.path;
+                const segEdges = Array.isArray(segPath) && segPath.length > 1
+                    ? segPath.slice(0, -1).map((a, i) => [a, segPath[i + 1]])
+                    : [];
+                startProgressiveExploration(stepsRes.steps || [], segEdges);
+            } catch (err) {
+                // Non-fatal: navigation can continue even if the steps trace fails.
+                console.warn('Failed to load steps for segment', currentSegment, err);
+            }
+        })();
+    }, [isPlaying, routeResult, currentSegment, destinations, algorithm, orderMode]);
 
     function stopExploration() {
         if (explorationTimer.current) {
@@ -103,14 +144,16 @@ export function PlaybackControls() {
         try {
             const [pathRes, stepsRes] = await Promise.all([
                 computePath({ algorithm, start: 'warehouse', destinations, orderMode }),
-                computePathSteps({ algorithm, start: 'warehouse', destinations, orderMode }),
+                computePathSteps({ algorithm, start: 'warehouse', destinations, orderMode, segmentIndex: 0 }),
             ]);
 
             setRouteResult(pathRes);
             setStepsResult(stepsRes);
+            setCurrentSegment(0);
             startProgressiveExploration(stepsRes.steps || [], pathRes.edges_traversed || []);
             setIsPlaying(true);
             setIsPaused(false);
+            lastLoadedSegment.current = 0;
         } catch (err) {
             const status = err?.response?.status;
             const detail = err?.response?.data?.detail;

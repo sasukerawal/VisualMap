@@ -49,12 +49,13 @@ export async function computePath({ algorithm, start, destinations, orderMode })
  * @param {string} orderMode
  * @returns {Promise<StepsResponse>}
  */
-export async function computePathSteps({ algorithm, start, destinations, orderMode }) {
+export async function computePathSteps({ algorithm, start, destinations, orderMode, segmentIndex }) {
     const res = await api.post('/api/path/steps', {
         algorithm,
         start,
         destinations,
         order_mode: orderMode,
+        ...(typeof segmentIndex === 'number' ? { segment_index: segmentIndex } : {}),
     });
     return res.data;
 }

@@ -199,16 +199,36 @@ async def compute_path(req: PathRequest):
 async def compute_path_steps(req: PathRequest):
     """
     Return step-by-step algorithm data for decision-tree visualization.
-    Currently visualizes only the first segment (start → first destination).
+    Visualizes one segment at a time (warehouse → dest[0], dest[0] → dest[1], ...).
     """
     if not req.destinations:
         raise HTTPException(status_code=422, detail="No destinations provided")
 
-    first_dest = req.destinations[0]
-    if first_dest not in NODES:
-        raise HTTPException(status_code=422, detail=f"Unknown node: '{first_dest}'")
+    # Validate nodes exist
+    for dest in req.destinations:
+        if dest not in NODES:
+            raise HTTPException(status_code=422, detail=f"Unknown node: '{dest}'")
+    if req.start not in NODES:
+        raise HTTPException(status_code=422, detail=f"Unknown start node: '{req.start}'")
 
-    result = _run_algorithm(req.algorithm, req.start, first_dest)
+    # Determine visit order (must match /api/path)
+    if req.order_mode == "optimized" and len(req.destinations) > 1:
+        ordered_dests = _nearest_neighbor_order(req.start, list(req.destinations))
+    else:
+        ordered_dests = list(req.destinations)
+
+    segment_index = req.segment_index or 0
+    if segment_index < 0:
+        raise HTTPException(status_code=422, detail="segment_index must be >= 0")
+
+    stops = [req.start] + ordered_dests
+    if segment_index >= len(stops) - 1:
+        raise HTTPException(status_code=422, detail=f"segment_index out of range (max {len(stops) - 2})")
+
+    seg_start = stops[segment_index]
+    seg_end = stops[segment_index + 1]
+
+    result = _run_algorithm(req.algorithm, seg_start, seg_end)
     tree_nodes, tree_edges = _build_tree(result.get("steps", []), req.algorithm)
 
     return StepsResponse(
