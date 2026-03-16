@@ -70,6 +70,9 @@ def bellman_ford(
                 relaxed_any = True
                 round_updates.append({
                     "edge": [u, v],
+                    "from_node": u,
+                    "edge_time_cost": round(time_cost, 2),
+                    "edge_distance": round(phys_dist, 2),
                     "new_dist": round(new_dist, 2),
                     "new_raw_dist": round(new_raw, 2),
                     "node": v,

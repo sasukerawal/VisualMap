@@ -24,7 +24,9 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 ALLOWED_ORIGINS = [
     "http://localhost:5173",       # Vite dev server
+    "http://127.0.0.1:5173",       # Vite dev server (alt host)
     "http://localhost:3000",       # Alternative dev port
+    "http://127.0.0.1:3000",       # Alternative dev port (alt host)
     os.getenv("FRONTEND_URL", ""), # Production Vercel URL
 ]
 # Filter empty strings

@@ -83,7 +83,11 @@ def astar(
                 heapq.heappush(open_heap, (f[v], v))
                 neighbors_updated.append({
                     "node": v,
+                    "from_node": u,
+                    "edge_time_cost": round(time_cost, 2),
+                    "edge_distance": round(phys_dist, 2),
                     "g": round(tentative_g, 2),
+                    "new_dist": round(tentative_g, 2),
                     "new_raw_dist": round(tentative_raw, 2),
                     "h": round(h_v, 2),
                     "f": round(f[v], 2),

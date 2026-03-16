@@ -1,20 +1,17 @@
 /**
  * TheoryTab - Step-by-step algorithm explanation viewer
- * Has its own step navigator so users can click through
- * each algorithmic decision and see the "Why this step?" reason.
+ * Dynamically adjusts complexity based on the selected Learning Mode.
  */
 import { useState, useEffect } from 'react';
 import { PSEUDOCODE } from '../../data/pseudocode';
 import useStore from '../../store/useStore';
 
 export function TheoryTab() {
-    const { algorithm, stepsResult, currentStepIndex, setCurrentStepIndex } = useStore();
+    const { algorithm, stepsResult, currentStepIndex, setCurrentStepIndex, learningMode } = useStore();
     const pseudocode = PSEUDOCODE[algorithm] || [];
 
-    // Use a local step index that syncs with the global one but can be controlled here too
     const [localStep, setLocalStep] = useState(currentStepIndex);
 
-    // Sync local when global changes (e.g. from DecisionTree slider)
     useEffect(() => {
         setLocalStep(currentStepIndex);
     }, [currentStepIndex]);
@@ -30,265 +27,257 @@ export function TheoryTab() {
         setCurrentStepIndex(clamped);
     }
 
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, height: '100%' }}>
+    const isBeginner = learningMode === 'beginner';
+    const isAdvanced = learningMode === 'advanced';
 
-            {/* Step Navigator — always visible if there are steps */}
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%', minHeight: 0 }}>
+
+            {/* Step Navigator */}
             {totalSteps > 0 && (
                 <div style={{
-                    background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-                    borderRadius: 10,
-                    padding: '10px 12px',
-                    border: '1px solid #334155',
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: 12,
+                    padding: '12px',
+                    border: '1px solid rgba(255,255,255,0.06)',
                     flexShrink: 0
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                            Step Navigator
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <span style={{ fontSize: '9px', fontWeight: 800, color: '#7a8aaa', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                            Algorithmic Step Trace
                         </span>
                         <span style={{
-                            fontSize: '12px', fontWeight: 800,
-                            color: '#818cf8', background: 'rgba(99,102,241,0.15)',
-                            padding: '2px 10px', borderRadius: 10
+                            fontSize: '11px', fontWeight: 800,
+                            color: '#8090ff', background: 'rgba(99,120,255,0.1)',
+                            padding: '2px 10px', borderRadius: 10,
+                            border: '1px solid rgba(99,120,255,0.2)'
                         }}>
                             {localStep + 1} / {totalSteps}
                         </span>
                     </div>
 
-                    {/* Slider */}
                     <input
                         type="range"
                         min="0"
                         max={totalSteps - 1}
                         value={localStep}
                         onChange={(e) => goTo(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: '#6366f1', cursor: 'pointer', marginBottom: 8, height: '12px' }}
+                        style={{ width: '100%', accentColor: '#6378ff', cursor: 'pointer', marginBottom: 10, height: '6px' }}
                     />
 
-                    {/* Prev / Next buttons */}
                     <div style={{ display: 'flex', gap: 6 }}>
                         <button
                             onClick={() => goTo(localStep - 1)}
                             disabled={localStep === 0}
                             style={{
-                                flex: 1, padding: '5px', fontSize: '12px', cursor: localStep === 0 ? 'not-allowed' : 'pointer',
-                                background: localStep === 0 ? 'rgba(51,65,85,0.4)' : 'rgba(99,102,241,0.2)',
-                                border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6,
-                                color: localStep === 0 ? '#475569' : '#818cf8', fontWeight: 600
+                                flex: 1, padding: '7px', fontSize: '11px', cursor: localStep === 0 ? 'not-allowed' : 'pointer',
+                                background: localStep === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(99,120,255,0.1)',
+                                border: '1px solid rgba(99,120,255,0.2)', borderRadius: 8,
+                                color: localStep === 0 ? '#4a5a70' : '#8090ff', fontWeight: 700,
+                                transition: 'all 0.2s'
                             }}
                         >
-                            ⬅ Prev
+                            ← Previous
                         </button>
                         <button
                             onClick={() => goTo(localStep + 1)}
                             disabled={localStep === totalSteps - 1}
                             style={{
-                                flex: 1, padding: '5px', fontSize: '12px', cursor: localStep === totalSteps - 1 ? 'not-allowed' : 'pointer',
-                                background: localStep === totalSteps - 1 ? 'rgba(51,65,85,0.4)' : 'rgba(99,102,241,0.2)',
-                                border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6,
-                                color: localStep === totalSteps - 1 ? '#475569' : '#818cf8', fontWeight: 600
+                                flex: 1, padding: '7px', fontSize: '11px', cursor: localStep === totalSteps - 1 ? 'not-allowed' : 'pointer',
+                                background: localStep === totalSteps - 1 ? 'rgba(255,255,255,0.02)' : 'rgba(99,120,255,0.1)',
+                                border: '1px solid rgba(99,120,255,0.2)', borderRadius: 8,
+                                color: localStep === totalSteps - 1 ? '#4a5a70' : '#8090ff', fontWeight: 700,
+                                transition: 'all 0.2s'
                             }}
                         >
-                            Next ➡
+                            Proceed →
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Core Demo Logic Info Box (Princeton Style) */}
-            <div style={{ background: '#f8fafc', borderBottom: '2px solid #334155', padding: '12px 16px', flexShrink: 0 }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: 500, color: '#000' }}>
-                    {algorithm === 'dijkstra' ? "Dijkstra's algorithm demo" :
-                        algorithm === 'astar' ? "A* algorithm demo" : "Bellman-Ford demo"}
-                </h3>
-                <ul style={{ margin: 0, paddingLeft: 20, fontSize: '13px', color: '#1e293b', lineHeight: 1.6 }}>
-                    {algorithm === 'dijkstra' && (
-                        <>
-                            <li>Consider vertices in increasing order of distance from <strong>s</strong> (non-tree vertex with the lowest <code>distTo[]</code> value).</li>
-                            <li>Add vertex to tree and <strong>relax</strong> all edges pointing from that vertex.</li>
-                        </>
-                    )}
-                    {algorithm === 'astar' && (
-                        <>
-                            <li>Consider vertices in increasing order of estimated total distance <strong>f(n) = g(n) + h(n)</strong>.</li>
-                            <li>Add vertex to tree and <strong>relax</strong> all edges pointing from that vertex.</li>
-                        </>
-                    )}
-                    {algorithm === 'bellman_ford' && (
-                        <>
-                            <li>Initialize <code>distTo[s] = 0</code> and all other <code>distTo[]</code> values to infinity.</li>
-                            <li>Repeat <strong>V</strong> times: <strong>relax</strong> each edge in the graph.</li>
-                        </>
-                    )}
-                </ul>
-            </div>
+            {/* Core Logic Rules (Context Sensitive) */}
+            {!isBeginner && (
+                <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 12, padding: '14px', border: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: '#eef2fb', letterSpacing: '-0.2px' }}>
+                        {algorithm === 'dijkstra' ? "Dijkstra's Invariant" :
+                            algorithm === 'astar' ? "A* Mathematical Guidance" : "Bellman-Ford Convergence"}
+                    </h3>
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: '11px', color: '#7a8aaa', lineHeight: 1.6 }}>
+                        {algorithm === 'dijkstra' && (
+                            <>
+                                <li>Select vertex <strong>v</strong> with minimum <code>distTo[v]</code> which is not yet in the shortest-path tree.</li>
+                                <li><strong>Relax</strong> all outgoing edges from <strong>v</strong> to update neighbors.</li>
+                            </>
+                        )}
+                        {algorithm === 'astar' && (
+                            <>
+                                <li>Prioritize node <strong>n</strong> with lowest estimated total cost: <code>f(n) = g(n) + h(n)</code>.</li>
+                                <li>Use the <strong>Euclidean Heuristic</strong> to guide search toward the geographical goal.</li>
+                            </>
+                        )}
+                        {algorithm === 'bellman_ford' && (
+                            <>
+                                <li>Systematically <strong>relax</strong> all edges in the graph across <strong>V-1</strong> iterations.</li>
+                                <li>Guarantees shortest paths even with negative edge weights (not present in this map).</li>
+                            </>
+                        )}
+                    </ul>
+                </div>
+            )}
 
             {/* WHY THIS STEP & MATH BREAKDOWN */}
             <div style={{
-                background: explanation
-                    ? 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(124,58,237,0.05))'
-                    : '#f8fafc',
-                borderRadius: 10,
-                border: explanation ? '1px solid rgba(99,102,241,0.25)' : '1px solid #e2e8f0',
-                padding: '12px',
+                background: 'rgba(0,0,0,0.2)',
+                borderRadius: 14,
+                border: '1px solid rgba(255,255,255,0.08)',
+                padding: '16px',
                 flexShrink: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 8
+                gap: 12
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <span style={{ fontSize: '18px' }}>💡</span>
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: explanation ? '#6366f1' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Why this step?
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(99,120,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8090ff', fontSize: '12px' }}>💡</div>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#8090ff', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                        Conceptual Reasoning
                     </span>
                     {currentStep && (
-                        <span style={{ fontSize: '10px', color: '#94a3b8', marginLeft: 'auto' }}>
-                            step #{localStep + 1} — {currentStep.node}
+                        <span style={{ fontSize: '9px', color: '#556080', fontWeight: 700, marginLeft: 'auto', textTransform: 'uppercase' }}>
+                            Step {localStep + 1}
                         </span>
                     )}
                 </div>
+
                 {explanation ? (
-                    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <p style={{
-                            fontSize: '13px', color: '#1e293b', lineHeight: 1.65,
+                            fontSize: '12px', color: '#cbd5e1', lineHeight: 1.7,
                             fontWeight: 500, margin: 0,
-                            background: 'rgba(255,255,255,0.7)', padding: '8px 10px',
-                            borderRadius: 6, borderLeft: '3px solid #6366f1'
                         }}>
                             {explanation}
                         </p>
 
-                        {/* Math Breakdown Panel */}
-                        {currentStep.math_breakdown && (
+                        {/* Math Breakdown Panel (Hidden in Beginner) */}
+                        {!isBeginner && currentStep.math_breakdown && (
                             <div style={{
-                                background: 'rgba(255,255,255,0.9)',
-                                borderRadius: 6,
-                                padding: '8px 10px',
-                                border: '1px solid rgba(99,102,241,0.15)',
-                                fontSize: '12px',
+                                background: 'rgba(255,255,255,0.03)',
+                                borderRadius: 8,
+                                padding: '10px',
+                                border: '1px solid rgba(255,255,255,0.06)',
+                                fontSize: '11px',
                                 fontFamily: 'var(--font-mono)',
-                                color: '#334155'
+                                color: '#94a3b8'
                             }}>
-                                <div style={{ fontSize: '10px', fontWeight: 700, color: '#818cf8', marginBottom: 4, textTransform: 'uppercase' }}>
-                                    Math Breakdown
+                                <div style={{ fontSize: '9px', fontWeight: 800, color: '#8090ff', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    Calculation Trace
                                 </div>
                                 {currentStep.math_breakdown.f !== undefined ? (
-                                    <div>
-                                        <span style={{ fontWeight: 600, color: '#d946ef' }}>f(n)</span> =
-                                        <span style={{ color: '#3b82f6' }}> g(n)</span> +
-                                        <span style={{ color: '#10b981' }}> h(n)</span>
-                                        <br />
-                                        <span style={{ fontWeight: 600, color: '#d946ef' }}>{currentStep.math_breakdown.f.toFixed(2)}s</span> =
-                                        <span style={{ color: '#3b82f6' }}> {currentStep.math_breakdown.g.toFixed(2)}s</span> +
-                                        <span style={{ color: '#10b981' }}> {currentStep.math_breakdown.h.toFixed(2)}s</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        <div>
+                                            <span style={{ color: '#818cf8', fontWeight: 700 }}>f(n)</span> =
+                                            <span style={{ color: '#6366f1' }}> g(n)</span> +
+                                            <span style={{ color: '#10b981' }}> h(n)</span>
+                                        </div>
+                                        <div style={{ color: '#e2e8f0', fontWeight: 700 }}>
+                                            {currentStep.math_breakdown.f.toFixed(2)}s =
+                                            <span style={{ color: '#6366f1' }}> {currentStep.math_breakdown.g.toFixed(2)}s</span> +
+                                            <span style={{ color: '#10b981' }}> {currentStep.math_breakdown.h.toFixed(2)}s</span>
+                                        </div>
                                     </div>
                                 ) : currentStep.math_breakdown.g !== undefined ? (
-                                    <div>
-                                        <span style={{ fontWeight: 600, color: '#3b82f6' }}>Transit Time g(n)</span> =
-                                        <span style={{ color: '#3b82f6' }}>{currentStep.math_breakdown.g.toFixed(2)}s</span>
-                                    </div>
-                                ) : currentStep.math_breakdown.relaxations_found !== undefined ? (
-                                    <div>
-                                        Edges fully relaxed: <span style={{ fontWeight: 800, color: '#f59e0b' }}>{currentStep.math_breakdown.relaxations_found}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ color: '#6366f1', fontWeight: 700 }}>Transit Cost g(n):</span>
+                                        <span style={{ color: '#e2e8f0', fontWeight: 800 }}>{currentStep.math_breakdown.g.toFixed(2)}s</span>
                                     </div>
                                 ) : null}
                             </div>
                         )}
                     </div>
-                ) : totalSteps > 0 ? (
-                    <p style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic', margin: 0, textAlign: 'center' }}>
-                        Use the slider above to navigate to a step.
-                    </p>
                 ) : (
-                    <p style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
-                        Explanations will appear here as you step through the algorithm.
+                    <p style={{ fontSize: '11px', color: '#556080', fontStyle: 'italic', margin: 0, textAlign: 'center', padding: '10px 0' }}>
+                        {totalSteps > 0 ? "Use the trace navigator above to explore the reasoning." : "Initialize a simulation to reveal algorithmic insights."}
                     </p>
                 )}
             </div>
 
-            {/* Pseudocode Viewer */}
-            <div style={{ flex: 1, background: '#0f172a', borderRadius: 10, padding: '12px', border: '1px solid #1e293b', overflowY: 'auto' }}>
-                <div style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8, fontWeight: 700 }}>
-                    📋 Pseudocode
-                    {activeLine && <span style={{ marginLeft: 8, color: '#818cf8' }}>← line {activeLine} active</span>}
-                </div>
-                {pseudocode.length === 0 ? (
-                    <p style={{ fontSize: '12px', color: '#475569', fontStyle: 'italic' }}>
-                        Select an algorithm to see its pseudocode.
-                    </p>
-                ) : (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.7 }}>
-                        {pseudocode.map((line) => {
-                            const isActive = line.line === activeLine;
-
-                            // Map simple plain English explanations to the pseudocode index
-                            let englishExplanation = "";
-                            if (isActive) {
-                                if (algorithm === 'dijkstra') {
-                                    if (line.line === 1) englishExplanation = "Initialize distTo[start]=0, others=∞.";
-                                    else if (line.line === 2) englishExplanation = "Enqueue start vertex to begin search.";
-                                    else if (line.line === 3) englishExplanation = "Consider vertices in increasing order of distance.";
-                                    else if (line.line === 4) englishExplanation = `Select non-tree vertex ${currentStep?.node ? `'${currentStep.node}'` : 'u'} with the lowest distTo[] value.`;
-                                    else if (line.line === 5) englishExplanation = `Target vertex reached. Shortest-paths tree complete.`;
-                                    else if (line.line === 6) englishExplanation = `Explore neighbors adjacent to ${currentStep?.node ? `'${currentStep.node}'` : 'u'}.`;
-                                    else if (line.line === 7) englishExplanation = "Check if taking this edge improves the known distance (relaxation condition).";
-                                    else if (line.line === 8) englishExplanation = `relax all edges pointing from ${currentStep?.node ? `'${currentStep.node}'` : 'this vertex'}. update edgeTo[] and distTo[].`;
-                                } else if (algorithm === 'astar') {
-                                    if (line.line === 1) englishExplanation = "Initialize arrays: g[start]=0, f[start]=h(start).";
-                                    else if (line.line === 2) englishExplanation = "Enqueue start vertex to begin search.";
-                                    else if (line.line === 3) englishExplanation = "Consider vertices in increasing order of f(n).";
-                                    else if (line.line === 4) englishExplanation = `Select non-tree vertex ${currentStep?.node ? `'${currentStep.node}'` : 'u'} with the lowest f(n) value.`;
-                                    else if (line.line === 5) englishExplanation = `Target vertex reached. Shortest-paths tree complete.`;
-                                    else if (line.line === 6) englishExplanation = `Explore neighbors adjacent to ${currentStep?.node ? `'${currentStep.node}'` : 'u'}.`;
-                                    else if (line.line === 7) englishExplanation = "Check if taking this edge improves the known distance (relaxation condition).";
-                                    else if (line.line === 8) englishExplanation = `relax all edges pointing from ${currentStep?.node ? `'${currentStep.node}'` : 'this vertex'}. update edgeTo[].`;
-                                } else if (algorithm === 'bellman_ford') {
-                                    if (line.line === 1) englishExplanation = "Initialize distTo[start]=0, others=∞.";
-                                    else if (line.line === 2) englishExplanation = "Outer loop: repeat V times.";
-                                    else if (line.line === 3) englishExplanation = "Inner loop: consider every edge in the graph.";
-                                    else if (line.line === 4) englishExplanation = "Check if taking this edge improves the known distance (relaxation condition).";
-                                    else if (line.line === 5) englishExplanation = "relax the edge. update edgeTo[] and distTo[].";
-                                    else if (line.line === 6) englishExplanation = "Final pass: if any edge can still be relaxed, a negative cycle exists.";
-                                }
-                            }
-
-                            return (
-                                <div key={line.line} style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <div
-                                        onClick={() => {
-                                            // Find a step that activates this line
-                                            const idx = stepsResult?.steps?.findIndex(s => s.active_line === line.line);
-                                            if (idx >= 0) goTo(idx);
-                                        }}
-                                        style={{
-                                            padding: '3px 8px',
-                                            borderRadius: 4,
-                                            background: isActive ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
-                                            color: isActive ? '#a5b4fc' : '#64748b',
-                                            borderLeft: isActive ? '3px solid #6366f1' : '3px solid transparent',
-                                            transition: 'all 0.2s ease',
-                                            whiteSpace: 'pre-wrap',
-                                            cursor: 'pointer',
-                                        }}
-                                        title="Click to jump to this line's first step"
-                                    >
-                                        <span style={{ opacity: 0.35, marginRight: 12, userSelect: 'none', display: 'inline-block', width: 14, textAlign: 'right' }}>
-                                            {line.line}
-                                        </span>
-                                        {line.text}
-                                    </div>
-                                    {isActive && englishExplanation && (
-                                        <div style={{ marginLeft: 34, marginTop: 4, marginBottom: 6, fontSize: '10px', color: '#10b981', fontStyle: 'italic', background: 'rgba(16,185,129,0.1)', padding: '4px 8px', borderRadius: 4 }}>
-                                            💡 {englishExplanation}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+            {/* Pseudocode Viewer (Simplified in Intermediate, Full in Advanced, Hidden in Beginner) */}
+            {!isBeginner && (
+                <div style={{ flex: 1, minHeight: 0, background: 'rgba(0,0,0,0.4)', borderRadius: 14, padding: '16px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexShrink: 0 }}>
+                        <div style={{ fontSize: '10px', color: '#7a8aaa', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 800 }}>
+                            Implementation Pseudocode
+                        </div>
+                        {activeLine && (
+                            <span style={{ fontSize: '9px', fontWeight: 700, color: '#818cf8', background: 'rgba(129,140,248,0.1)', padding: '2px 6px', borderRadius: 4 }}>
+                                ACTIVE L#{activeLine}
+                            </span>
+                        )}
                     </div>
-                )}
-            </div>
 
+                    <div className="custom-scroll" style={{ flex: 1, overflowY: 'auto' }}>
+                        {pseudocode.length === 0 ? (
+                            <p style={{ fontSize: '11px', color: '#4a5a70', fontStyle: 'italic' }}>
+                                Awaiting algorithm selection...
+                            </p>
+                        ) : (
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', lineHeight: 1.8 }}>
+                                {pseudocode.map((line) => {
+                                    const isActive = line.line === activeLine;
+
+                                    // Map simple plain English explanations to the pseudocode index
+                                    let englishExplanation = "";
+                                    if (isActive) {
+                                        if (algorithm === 'dijkstra') {
+                                            if (line.line === 1) englishExplanation = "Initialization: Assigning the starting distance of 0 to the source, and ∞ to all other nodes.";
+                                            else if (line.line === 3) englishExplanation = `Greedy choice: Extracting node "${currentStep.node}" because it has the current minimum distance from start.`;
+                                            else if (line.line === 5) englishExplanation = `Found the absolute shortest path to node "${currentStep.node}". Mark it as settled.`;
+                                            else if (line.line === 8) englishExplanation = "Edge Relaxation: Checking if passing through the current node creates a faster path to its neighbors.";
+                                        } else if (algorithm === 'astar') {
+                                            if (line.line === 4) englishExplanation = `Focused search: Picking node "${currentStep.node}" with the lowest total estimated cost f(n) = g(n) + h(n).`;
+                                            else if (line.line === 8) englishExplanation = "Heuristic improvement: Updating neighbor's distance and priority based on physical proximity to goal.";
+                                        } else if (algorithm === 'bellman_ford') {
+                                            if (line.line === 5) englishExplanation = "Systematic pass: Relaxing every edge in the graph to propagate shortest distance values.";
+                                        }
+                                    }
+
+                                    return (
+                                        <div key={line.line} style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <div
+                                                onClick={() => {
+                                                    const idx = stepsResult?.steps?.findIndex(s => s.active_line === line.line);
+                                                    if (idx >= 0) goTo(idx);
+                                                }}
+                                                style={{
+                                                    padding: '4px 10px',
+                                                    borderRadius: 6,
+                                                    background: isActive ? 'rgba(99, 120, 255, 0.15)' : 'transparent',
+                                                    color: isActive ? '#eef2fb' : '#4a5a70',
+                                                    borderLeft: isActive ? '3px solid #6378ff' : '3px solid transparent',
+                                                    transition: 'all 0.2s ease',
+                                                    whiteSpace: 'pre-wrap',
+                                                    cursor: 'pointer',
+                                                    fontWeight: isActive ? 700 : 400
+                                                }}
+                                            >
+                                                <span style={{ opacity: 0.35, marginRight: 14, userSelect: 'none', display: 'inline-block', width: 14, textAlign: 'right' }}>
+                                                    {line.line}
+                                                </span>
+                                                {line.text}
+                                            </div>
+                                            {isActive && englishExplanation && (
+                                                <div style={{ marginLeft: 38, marginTop: 4, marginBottom: 8, fontSize: '9px', color: '#10b981', fontWeight: 700, fontStyle: 'italic', background: 'rgba(16,185,129,0.08)', padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(16,185,129,0.1)' }}>
+                                                    ➜ {englishExplanation}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

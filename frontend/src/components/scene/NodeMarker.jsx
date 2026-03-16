@@ -1,23 +1,26 @@
-/**
- * NodeMarker — renders intersection nodes as glowing dots.
- * Highlights explored and path nodes with different colors.
- */
-import { useRef } from 'react';
+import { memo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
+import * as THREE from 'three';
 
-export function NodeMarker({ nodeId, position, label, isExplored, isOnPath }) {
+export const NodeMarker = memo(function NodeMarker({ nodeId, position, label, isExplored, isOnPath }) {
     const meshRef = useRef();
+    const [hovered, setHovered] = useState(false);
+    const tmpScaleRef = useRef(new THREE.Vector3(1, 1, 1));
 
-    useFrame((state) => {
-        if (meshRef.current && (isExplored || isOnPath)) {
-            const t = state.clock.elapsedTime + position[0];
-            meshRef.current.scale.setScalar(1 + Math.sin(t * 3) * 0.12);
-        }
+    useFrame((state, delta) => {
+        if (!meshRef.current) return;
+        const t = state.clock.elapsedTime + position[0];
+        const heartbeat = isExplored || isOnPath ? Math.sin(t * 3) * 0.12 : 0;
+        const targetScale = hovered ? 1.5 : 1.0;
+        const currentScale = 1 + heartbeat;
+        const s = targetScale * currentScale;
+        tmpScaleRef.current.set(s, s, s);
+        meshRef.current.scale.lerp(tmpScaleRef.current, delta * 10);
     });
 
     let color = '#aabcc4';
-    let emissive = '#1a2035';
+    let emissive = '#101827';
     let emissiveIntensity = 0;
     let size = 0.2;
 
@@ -27,42 +30,54 @@ export function NodeMarker({ nodeId, position, label, isExplored, isOnPath }) {
         emissiveIntensity = 1;
         size = 0.28;
     } else if (isExplored) {
-        color = '#3a7dc8';
-        emissive = '#2e6bb3';
+        color = '#5b9cf6';
+        emissive = '#3a7dc8';
         emissiveIntensity = 0.7;
         size = 0.24;
     }
 
     return (
-        <group position={position}>
+        <group
+            position={position}
+            onPointerOver={(e) => {
+                e.stopPropagation();
+                setHovered(true);
+                document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={(e) => {
+                e.stopPropagation();
+                setHovered(false);
+                document.body.style.cursor = 'auto';
+            }}
+        >
             <mesh ref={meshRef}>
                 <sphereGeometry args={[size, 10, 10]} />
-                <meshStandardMaterial
-                    color={color}
-                    emissive={emissive}
-                    emissiveIntensity={emissiveIntensity}
-                />
+                <meshStandardMaterial color={color} emissive={emissive} emissiveIntensity={emissiveIntensity} />
             </mesh>
 
             {label && (
                 <Html
                     center
                     distanceFactor={18}
+                    position={[0, 0.65, 0]}
                     style={{
-                        fontSize: '9px',
-                        color: isOnPath ? '#2ecc71' : isExplored ? '#3a7dc8' : '#8892b0',
-                        background: 'rgba(255,255,255,0.9)',
-                        padding: '1px 4px',
-                        borderRadius: '3px',
+                        fontSize: '10px',
+                        color: isOnPath ? '#86efac' : isExplored ? '#9fd0ff' : '#9fb0ca',
+                        background: 'rgba(12, 18, 30, 0.76)',
+                        border: '1px solid rgba(148,163,184,0.22)',
+                        padding: '6px 10px',
+                        borderRadius: '10px',
                         whiteSpace: 'nowrap',
                         pointerEvents: 'none',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        boxShadow: '0 12px 26px rgba(0,0,0,0.22)',
+                        backdropFilter: 'blur(10px)',
+                        transform: `translateY(-10px) scale(${hovered ? 1.12 : 1.0})`,
+                        transition: 'transform 0.2s ease-out',
                     }}
-                    position={[0, 0.6, 0]}
                 >
-                    {nodeId}
+                    {label}
                 </Html>
             )}
         </group>
     );
-}
+});

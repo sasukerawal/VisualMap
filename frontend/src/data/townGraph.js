@@ -8,44 +8,44 @@ export const NODES = {
     warehouse: { label: "Warehouse", pos: [-34, 0, -16], type: "warehouse" },
 
     // North perimeter (one-way W→E, z=-25)
-    n_wh: { label: "N-WH", pos: [-30, 0, -25], type: "intersection" },
-    n_A: { label: "N-A", pos: [-18, 0, -25], type: "intersection" },
-    n_AB: { label: "N-AB", pos: [-10, 0, -25], type: "intersection" },
-    n_B: { label: "N-B", pos: [-2, 0, -25], type: "intersection" },
-    n_BC: { label: "N-BC", pos: [6, 0, -25], type: "intersection" },
-    n_C: { label: "N-C", pos: [14, 0, -25], type: "intersection" },
-    n_CD: { label: "N-CD", pos: [22, 0, -25], type: "intersection" },
-    n_D: { label: "N-D", pos: [30, 0, -25], type: "intersection" },
-    n_De: { label: "N-De", pos: [38, 0, -25], type: "intersection" },
+    n_wh: { label: "Industrial Pkwy & West Ave", pos: [-30, 0, -25], type: "intersection" },
+    n_A: { label: "Industrial Pkwy & Apple St", pos: [-18, 0, -25], type: "intersection" },
+    n_AB: { label: "Industrial Pkwy & Central Blvd", pos: [-10, 0, -25], type: "intersection" },
+    n_B: { label: "Industrial Pkwy & Baker Ave", pos: [-2, 0, -25], type: "intersection" },
+    n_BC: { label: "Industrial Pkwy & Cedar Ln", pos: [6, 0, -25], type: "intersection" },
+    n_C: { label: "Industrial Pkwy & Cedar Ln Exit", pos: [14, 0, -25], type: "intersection" },
+    n_CD: { label: "Industrial Pkwy & Daisy Rd", pos: [22, 0, -25], type: "intersection" },
+    n_D: { label: "Industrial Pkwy & Daisy Connector", pos: [30, 0, -25], type: "intersection" },
+    n_De: { label: "Industrial Pkwy & East Blvd", pos: [38, 0, -25], type: "intersection" },
 
     // Middle road (two-way, z=-3)
-    m_w: { label: "M-W", pos: [-30, 0, -3], type: "intersection" },
-    m_A: { label: "M-A", pos: [-18, 0, -3], type: "intersection" },
-    m_AB: { label: "M-AB", pos: [-10, 0, -3], type: "intersection" },
-    m_B: { label: "M-B", pos: [-2, 0, -3], type: "intersection" },
-    m_BC: { label: "M-BC", pos: [6, 0, -3], type: "intersection" },
-    m_C: { label: "M-C", pos: [14, 0, -3], type: "intersection" },
-    m_CD: { label: "M-CD", pos: [22, 0, -3], type: "intersection" },
-    m_D: { label: "M-D", pos: [30, 0, -3], type: "intersection" },
-    m_e: { label: "M-E", pos: [38, 0, -3], type: "intersection" },
+    m_w: { label: "Liberty Ave & West Ave", pos: [-30, 0, -3], type: "intersection" },
+    m_A: { label: "Liberty Ave & Apple St", pos: [-18, 0, -3], type: "intersection" },
+    m_AB: { label: "Liberty Ave & Central Blvd", pos: [-10, 0, -3], type: "intersection" },
+    m_B: { label: "Liberty Ave & Baker Ave", pos: [-2, 0, -3], type: "intersection" },
+    m_BC: { label: "Liberty Ave & Cedar Ln", pos: [6, 0, -3], type: "intersection" },
+    m_C: { label: "Liberty Ave & Cedar Pkwy", pos: [14, 0, -3], type: "intersection" },
+    m_CD: { label: "Liberty Ave & Daisy Rd", pos: [22, 0, -3], type: "intersection" },
+    m_D: { label: "Liberty Ave & Daisy Connector", pos: [30, 0, -3], type: "intersection" },
+    m_e: { label: "Liberty Ave & East Blvd", pos: [38, 0, -3], type: "intersection" },
 
     // Row-1 north road (two-way, z=3)
-    r1_w: { label: "R1-W", pos: [-30, 0, 3], type: "intersection" },
-    r1_E: { label: "R1-E", pos: [-11, 0, 3], type: "intersection" },
-    r1_EF: { label: "R1-EF", pos: [-4, 0, 3], type: "intersection" },
-    r1_F: { label: "R1-F", pos: [3, 0, 3], type: "intersection" },
-    r1_FG: { label: "R1-FG", pos: [10, 0, 3], type: "intersection" },
-    r1_G: { label: "R1-G", pos: [17, 0, 3], type: "intersection" },
-    r1_e: { label: "R1-GE", pos: [38, 0, 3], type: "intersection" },
+    r1_w: { label: "Oak St & West Ave", pos: [-30, 0, 3], type: "intersection" },
+    r1_E: { label: "Oak St & Elm Way Connector", pos: [-11, 0, 3], type: "intersection" },
+    r1_EF: { label: "Oak St & Central Blvd", pos: [-4, 0, 3], type: "intersection" },
+    r1_F: { label: "Oak St & Fig Blvd Connector", pos: [3, 0, 3], type: "intersection" },
+    r1_FG: { label: "Oak St & Pine Pkwy", pos: [10, 0, 3], type: "intersection" },
+    r1_G: { label: "Oak St & Grove Ct Connector", pos: [17, 0, 3], type: "intersection" },
+    r1_e: { label: "Oak St & East Blvd", pos: [38, 0, 3], type: "intersection" },
 
     // South perimeter (one-way E→W, z=19)
-    s_e: { label: "S-E", pos: [38, 0, 19], type: "intersection" },
-    s_G: { label: "S-G", pos: [17, 0, 19], type: "intersection" },
-    s_FG: { label: "S-FG", pos: [10, 0, 19], type: "intersection" },
-    s_F: { label: "S-F", pos: [3, 0, 19], type: "intersection" },
-    s_EF: { label: "S-EF", pos: [-4, 0, 19], type: "intersection" },
-    s_E: { label: "S-E2", pos: [-11, 0, 19], type: "intersection" },
-    s_w: { label: "S-W", pos: [-30, 0, 19], type: "intersection" },
+    s_e: { label: "Coastline Hwy & East Blvd", pos: [38, 0, 19], type: "intersection" },
+    s_G: { label: "Coastline Hwy & Grove Ct South", pos: [17, 0, 19], type: "intersection" },
+    s_FG: { label: "Coastline Hwy & Pine Pkwy South", pos: [10, 0, 19], type: "intersection" },
+    s_F: { label: "Coastline Hwy & Fig Blvd South", pos: [3, 0, 19], type: "intersection" },
+    s_EF: { label: "Coastline Hwy & Central Blvd South", pos: [-4, 0, 19], type: "intersection" },
+    s_E: { label: "Coastline Hwy & Elm Way South", pos: [-11, 0, 19], type: "intersection" },
+    s_w: { label: "Coastline Hwy & West Ave", pos: [-30, 0, 19], type: "intersection" },
 
     // ---- Block A Driveways ----
     drv_A1: { label: "", pos: [-18, 0, -20], type: "intersection" },
@@ -238,3 +238,24 @@ export const EDGES = _makeEdges();
 
 // Helper to get one-way edges
 export const ONE_WAY_EDGES = EDGES.filter(e => e.one_way === true).map(e => [e.source, e.target, e.one_way]);
+
+export function displayNodeName(nodeId) {
+    const n = NODES[nodeId];
+    if (typeof n?.label === 'string' && n.label.trim().length > 0) return n.label;
+    if (nodeId === 'warehouse') return 'Warehouse';
+
+    if (nodeId.startsWith('drv_')) {
+        // e.g. drv_A1 -> Driveway A1
+        return `Driveway ${nodeId.slice(4)}`;
+    }
+
+    // Common intersection naming
+    const cleaned = nodeId
+        .replace(/_/g, ' ')
+        .replace(/^n /, 'North ')
+        .replace(/^m /, 'Mid ')
+        .replace(/^r1 /, 'Row 1 ')
+        .replace(/^s /, 'South ');
+
+    return cleaned;
+}

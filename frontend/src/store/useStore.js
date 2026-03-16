@@ -65,36 +65,107 @@ const useStore = create((set, get) => ({
     isLoading: false,
     error: null,
 
+    learningMode: 'intermediate', // 'beginner' | 'intermediate' | 'advanced'
+    setLearningMode: (mode) => set({ learningMode: mode }),
+
     setShowLabels: (v) => set({ showLabels: v }),
     toggleDarkMode: () => set({ darkMode: !get().darkMode }),
     setCameraAngle: (v) => set({ cameraAngle: v }),
     setIsLoading: (v) => set({ isLoading: v }),
     setError: (e) => set({ error: e }),
 
-    // ── Full Reset ────────────────────────────────────────────────────────
-    resetAll: () => set({
-        destinations: [],
-        routeResult: null,
-        stepsResult: null,
-        isPlaying: false,
-        isPaused: false,
-        currentPathIndex: 0,
-        currentSegment: 0,
-        deliveredNodes: [],
-        exploredNodes: [],
-        exploredEdges: [],
-        error: null,
-    }),
+    // Modal/overlay coordination (prevents 3D Html labels bleeding through)
+    isUiOverlayOpen: false,
+    setUiOverlayOpen: (v) => set({ isUiOverlayOpen: v }),
 
-    resetAnimation: () => set({
-        isPlaying: false,
-        isPaused: false,
-        currentPathIndex: 0,
-        currentSegment: 0,
-        deliveredNodes: [],
-        exploredNodes: [],
-        exploredEdges: [],
-    }),
+    // Timeline playback (Theory / Topography)
+    isTimelinePlaying: false,
+    isTimelinePaused: false,
+    timelineTimerId: null,
+
+    runSimulation: () => {
+        const { stepsResult, animationSpeed, timelineTimerId } = get();
+        if (!stepsResult?.steps?.length) return;
+
+        if (timelineTimerId) clearInterval(timelineTimerId);
+        set({ isTimelinePlaying: true, isTimelinePaused: false });
+
+        const interval = setInterval(() => {
+            const state = get();
+            if (state.isTimelinePaused) return;
+
+            const last = (state.stepsResult?.steps?.length || 0) - 1;
+            if (state.currentStepIndex < last) {
+                set({ currentStepIndex: state.currentStepIndex + 1 });
+            } else {
+                get().pauseSimulation();
+            }
+        }, 1000 / animationSpeed);
+
+        set({ timelineTimerId: interval });
+    },
+
+    pauseSimulation: () => {
+        const { timelineTimerId } = get();
+        if (timelineTimerId) clearInterval(timelineTimerId);
+        set({ isTimelinePlaying: false, isTimelinePaused: true, timelineTimerId: null });
+    },
+
+    resetSimulation: () => {
+        const { timelineTimerId } = get();
+        if (timelineTimerId) clearInterval(timelineTimerId);
+        set({
+            isTimelinePlaying: false,
+            isTimelinePaused: false,
+            currentStepIndex: 0,
+            timelineTimerId: null
+        });
+    },
+
+    // ── Full Reset ────────────────────────────────────────────────────────
+    resetAll: () => {
+        const { timerId, timelineTimerId } = get();
+        if (timerId) clearInterval(timerId);
+        if (timelineTimerId) clearInterval(timelineTimerId);
+        set({
+            destinations: [],
+            routeResult: null,
+            stepsResult: null,
+            isPlaying: false,
+            isPaused: false,
+            currentPathIndex: 0,
+            currentSegment: 0,
+            currentStepIndex: 0,
+            deliveredNodes: [],
+            exploredNodes: [],
+            exploredEdges: [],
+            error: null,
+            timerId: null,
+            isTimelinePlaying: false,
+            isTimelinePaused: false,
+            timelineTimerId: null,
+        });
+    },
+
+    resetAnimation: () => {
+        const { timerId, timelineTimerId } = get();
+        if (timerId) clearInterval(timerId);
+        if (timelineTimerId) clearInterval(timelineTimerId);
+        set({
+            isPlaying: false,
+            isPaused: false,
+            currentPathIndex: 0,
+            currentSegment: 0,
+            currentStepIndex: 0,
+            deliveredNodes: [],
+            exploredNodes: [],
+            exploredEdges: [],
+            timerId: null,
+            isTimelinePlaying: false,
+            isTimelinePaused: false,
+            timelineTimerId: null,
+        });
+    },
 }));
 
 export default useStore;

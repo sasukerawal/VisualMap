@@ -78,6 +78,9 @@ def dijkstra(
                 heapq.heappush(heap, (new_dist, v))
                 neighbors_updated.append({
                     "node": v, 
+                    "from_node": u,
+                    "edge_time_cost": round(time_cost, 2),
+                    "edge_distance": round(phys_dist, 2),
                     "new_dist": round(new_dist, 2),
                     "new_raw_dist": round(new_raw, 2),
                     "relaxed": True

@@ -5,7 +5,7 @@
  */
 import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Stars, Html } from '@react-three/drei';
+import { OrbitControls, Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import { Road } from './Road';
 import { House } from './House';
@@ -14,8 +14,9 @@ import { DeliveryVan } from './DeliveryVan';
 import { NodeMarker } from './NodeMarker';
 import { DeliveryPin } from './DeliveryPin';
 import { Tree } from './Tree';
-import { NODES, EDGES, ADDRESS_NODES } from '../../data/townGraph';
+import { NODES, EDGES, ADDRESS_NODES, displayNodeName } from '../../data/townGraph';
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 
 // Block definitions: center [cx, cz] and color theme index
 // Each block is split into Left and Right lots with an alleyway in the middle
@@ -35,14 +36,16 @@ function BlockLot({ cx, cz, w, d, seed }) {
     // Generate some random tree positions within this lot
     const trees = useMemo(() => {
         const arr = [];
-        const count = 3;
+        const count = 5; // Increased density
         for (let i = 0; i < count; i++) {
-            const rx = (Math.sin(seed * 42 + i * 17) * 0.4) * w;
-            const rz = (Math.cos(seed * 24 + i * 13) * 0.4) * d;
-            const isPine = Math.sin(seed + i) > 0;
+            const rx = (Math.sin(seed * 42 + i * 17) * 0.45) * w;
+            const rz = (Math.cos(seed * 24 + i * 13) * 0.45) * d;
+            const isPine = Math.sin(seed + i * 2) > 0;
+            const scale = 0.6 + Math.abs(Math.sin(seed * i)) * 1.2; // More scale variety
+
             // Place trees away from the direct center to avoid clipping with houses
-            if (Math.abs(rx) > 2 || Math.abs(rz) > 2) {
-                arr.push({ x: rx, z: rz, type: isPine ? 'pine' : 'deciduous', scale: 0.8 + Math.abs(Math.sin(seed * i)) * 0.4 });
+            if (Math.abs(rx) > 2.5 || Math.abs(rz) > 2.5) {
+                arr.push({ x: rx, z: rz, type: isPine ? 'pine' : 'deciduous', scale });
             }
         }
         return arr;
@@ -52,13 +55,13 @@ function BlockLot({ cx, cz, w, d, seed }) {
         <group position={[cx, 0, cz]}>
             {/* Sidewalk base */}
             <mesh receiveShadow position={[0, 0.02, 0]}>
-                <boxGeometry args={[w + 0.8, 0.04, d + 0.8]} />
-                <meshStandardMaterial color="#e0e6ed" roughness={0.95} />
+                <boxGeometry args={[w + 1.2, 0.04, d + 1.2]} />
+                <meshStandardMaterial color="#cbd5e1" roughness={0.9} />
             </mesh>
             {/* Green Lawn */}
             <mesh receiveShadow position={[0, 0.05, 0]}>
-                <boxGeometry args={[w, 0.04, d]} />
-                <meshStandardMaterial color="#587e41" roughness={0.9} />
+                <boxGeometry args={[w, 0.06, d]} />
+                <meshStandardMaterial color="#4d7c0f" roughness={1.0} />
             </mesh>
             {/* Trees */}
             {trees.map((t, i) => (
@@ -75,18 +78,18 @@ function CameraRig({ cameraAngle }) {
 
     useEffect(() => {
         if (cameraAngle === 'top') {
-            camera.position.set(2, 70, 0.01);
+            camera.position.set(0, 80, 0.01);
             camera.up.set(0, 0, -1);
             if (camera.isOrthographicCamera) {
-                camera.zoom = 14;
+                camera.zoom = 12;
                 camera.updateProjectionMatrix();
             }
         } else {
-            camera.position.set(-5, 38, 50);
+            camera.position.set(-15, 45, 60);
             camera.up.set(0, 1, 0);
         }
         if (controlsRef.current) {
-            controlsRef.current.target.set(4, 0, -4);
+            controlsRef.current.target.set(0, 0, -2);
             controlsRef.current.update();
         }
     }, [cameraAngle]);
@@ -97,27 +100,39 @@ function CameraRig({ cameraAngle }) {
             enablePan
             enableRotate={cameraAngle === 'perspective'}
             enableZoom
-            panSpeed={0.35}
-            rotateSpeed={0.3}
-            zoomSpeed={0.6}
-            dampingFactor={0.06}
+            panSpeed={0.4}
+            rotateSpeed={0.4}
+            zoomSpeed={0.8}
+            dampingFactor={0.05}
             enableDamping
-            maxPolarAngle={Math.PI / 2.1}
-            minDistance={12}
-            maxDistance={100}
-            target={[4, 0, -4]}
+            maxPolarAngle={Math.PI / 2.2}
+            minDistance={15}
+            maxDistance={120}
+            target={[0, 0, -2]}
         />
     );
 }
 
 function SceneContent() {
-    const { cameraAngle, showLabels, destinations, exploredNodes, exploredEdges, routeResult } = useStore();
+    const { cameraAngle, showLabels, destinations, exploredNodes, exploredEdges, routeResult, stepsResult, currentStepIndex } = useStore(
+        (s) => ({
+            cameraAngle: s.cameraAngle,
+            showLabels: s.showLabels,
+            destinations: s.destinations,
+            exploredNodes: s.exploredNodes,
+            exploredEdges: s.exploredEdges,
+            routeResult: s.routeResult,
+            stepsResult: s.stepsResult,
+            currentStepIndex: s.currentStepIndex,
+        }),
+        shallow
+    );
+    const uiOverlayOpen = useStore((s) => s.isUiOverlayOpen);
     const { camera } = useThree();
 
     // Switch camera type on angle change
     useEffect(() => {
         if (cameraAngle === 'top') {
-            // Switch to orthographic-like perspective by angling straight down
             camera.fov = 50;
             camera.updateProjectionMatrix();
         } else {
@@ -128,17 +143,35 @@ function SceneContent() {
 
     const finalPath = routeResult?.path || [];
     const addressNodeIds = useMemo(() => new Set(ADDRESS_NODES.map(n => n.id)), []);
+
+    // Edges belonging to the final shortest path
     const finalEdgeSet = useMemo(() => {
         const s = new Set();
         (routeResult?.edges_traversed || []).forEach(([a, b]) => { s.add(`${a}-${b}`); s.add(`${b}-${a}`); });
         return s;
     }, [routeResult]);
 
+    // Edges that have been visited/settled throughout the simulation so far
     const exploredSet = useMemo(() => {
         const s = new Set();
         exploredEdges.forEach(k => { s.add(k); s.add(k.split('-').reverse().join('-')); });
         return s;
     }, [exploredEdges]);
+
+    // Edges being "relaxed" in the current single step
+    const activeRelaxedEdges = useMemo(() => {
+        const s = new Set();
+        const currentStep = stepsResult?.steps?.[currentStepIndex];
+        if (currentStep && currentStep.node && currentStep.neighbors_updated) {
+            const u = currentStep.node;
+            currentStep.neighbors_updated.forEach(nb => {
+                const v = nb.node;
+                s.add(`${u}-${v}`);
+                s.add(`${v}-${u}`);
+            });
+        }
+        return s;
+    }, [stepsResult, currentStepIndex]);
 
     // Group houses by block for index offset
     const housesByBlock = useMemo(() => {
@@ -157,9 +190,11 @@ function SceneContent() {
 
             {/* Atmosphere (Daytime) */}
             <fog attach="fog" args={['#87CEEB', 60, 150]} />
+            <Sky distance={450000} sunPosition={[-1, 0.6, 0.2]} turbidity={7} rayleigh={2.5} mieCoefficient={0.006} mieDirectionalG={0.8} />
 
             {/* Lights (Bright Daylight) */}
             <ambientLight intensity={1.3} color="#ffffff" />
+            <hemisphereLight intensity={0.55} groundColor="#334155" color="#dbeafe" />
             <directionalLight
                 castShadow
                 position={[-30, 60, 40]}
@@ -177,7 +212,7 @@ function SceneContent() {
             {/* Ground (Dirt/Earth underneath) */}
             <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
                 <planeGeometry args={[120, 90]} />
-                <meshStandardMaterial color="#524636" roughness={0.95} />
+                <meshStandardMaterial color="#3b3a2f" roughness={0.98} />
             </mesh>
 
             {/* Block Lots (Left and Right of the alleyway) */}
@@ -189,19 +224,25 @@ function SceneContent() {
             ))}
 
             {/* Roads */}
-            {EDGES.map((edge, i) => (
-                <Road
-                    key={`e-${i}`}
-                    from={NODES[edge.source]?.pos}
-                    to={NODES[edge.target]?.pos}
-                    oneWay={edge.one_way}
-                    speedLimit={edge.speed_limit}
-                    roadType={edge.road_type}
-                    isExplored={exploredSet.has(`${edge.source}-${edge.target}`) || exploredSet.has(`${edge.target}-${edge.source}`)}
-                    isFinal={finalEdgeSet.has(`${edge.source}-${edge.target}`)}
-                    isDriveway={addressNodeIds.has(edge.source) || addressNodeIds.has(edge.target)}
-                />
-            ))}
+            {EDGES.map((edge, i) => {
+                const edgeKey = `${edge.source}-${edge.target}`;
+                const revEdgeKey = `${edge.target}-${edge.source}`;
+                return (
+                    <Road
+                        key={`e-${i}`}
+                        from={NODES[edge.source]?.pos}
+                        to={NODES[edge.target]?.pos}
+                        oneWay={edge.one_way}
+                        speedLimit={edge.speed_limit}
+                        roadType={edge.road_type}
+                        isExplored={exploredSet.has(edgeKey) || exploredSet.has(revEdgeKey)}
+                        isFinal={finalEdgeSet.has(edgeKey) || finalEdgeSet.has(revEdgeKey)}
+                        isActiveRelaxed={activeRelaxedEdges.has(edgeKey) || activeRelaxedEdges.has(revEdgeKey)}
+                        isDriveway={addressNodeIds.has(edge.source) || addressNodeIds.has(edge.target)}
+                        uiOverlayOpen={uiOverlayOpen}
+                    />
+                );
+            })}
 
             {/* Houses */}
             {ADDRESS_NODES.map((node, i) => (
@@ -224,7 +265,7 @@ function SceneContent() {
                         key={id}
                         nodeId={id}
                         position={node.pos}
-                        label={showLabels ? node.label : null}
+                        label={showLabels && !uiOverlayOpen ? displayNodeName(id) : null}
                         isExplored={exploredNodes.includes(id)}
                         isOnPath={finalPath.includes(id)}
                     />
@@ -239,7 +280,7 @@ function SceneContent() {
                     label={node.label}
                     isSelected={destinations.includes(node.id)}
                     isOnPath={finalPath.includes(node.id)}
-                    showLabel={showLabels}
+                    showLabel={showLabels && !uiOverlayOpen}
                 />
             ))}
 
@@ -250,14 +291,15 @@ function SceneContent() {
 }
 
 export function TownScene() {
-    const { cameraAngle } = useStore();
+    const cameraAngle = useStore((s) => s.cameraAngle);
 
     return (
         <div style={{ width: '100%', height: '100%', background: '#87CEEB' }}>
             <Canvas
                 shadows
                 camera={{ fov: 50, position: [-5, 38, 50], near: 0.1, far: 200 }}
-                gl={{ antialias: true, failIfMajorPerformanceCaveat: false }}
+                dpr={[1, 1.5]}
+                gl={{ antialias: true, failIfMajorPerformanceCaveat: false, powerPreference: 'high-performance' }}
             >
                 <SceneContent />
             </Canvas>

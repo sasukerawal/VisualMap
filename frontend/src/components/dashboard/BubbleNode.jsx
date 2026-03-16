@@ -1,133 +1,171 @@
-/**
- * BubbleNode — a readable card-style node for the decision tree.
- * Shows the node name, state label, and key scores clearly.
- */
+import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
+import { displayNodeName } from '../../data/townGraph';
 
-const STATE_CONFIG = {
-    active: {
-        bg: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-        border: '2px solid #818cf8',
-        textColor: '#fff',
-        badge: '🔵 Processing',
-        badgeBg: 'rgba(255,255,255,0.2)',
-        glow: '0 0 20px rgba(99,102,241,0.6), 0 4px 12px rgba(0,0,0,0.2)',
-    },
-    settled: {
-        bg: 'linear-gradient(135deg, #16a34a, #22c55e)',
-        border: '2px solid #4ade80',
-        textColor: '#fff',
-        badge: '✅ Settled',
-        badgeBg: 'rgba(255,255,255,0.2)',
-        glow: '0 4px 12px rgba(34,197,94,0.4)',
-    },
-    candidate: {
-        bg: 'linear-gradient(135deg, #d97706, #f59e0b)',
-        border: '2px dashed #fbbf24',
-        textColor: '#fff',
-        badge: '⏳ Candidate',
-        badgeBg: 'rgba(255,255,255,0.2)',
-        glow: '0 4px 8px rgba(245,158,11,0.3)',
-    },
-    goal: {
-        bg: 'linear-gradient(135deg, #b45309, #d97706)',
-        border: '3px solid #fbbf24',
-        textColor: '#fff',
-        badge: '⭐ Goal!',
-        badgeBg: 'rgba(255,255,255,0.25)',
-        glow: '0 0 24px rgba(251,191,36,0.7)',
-    },
-    skipped: {
-        bg: '#f1f5f9',
-        border: '1px dashed #cbd5e1',
-        textColor: '#94a3b8',
-        badge: 'Skipped',
-        badgeBg: '#e2e8f0',
-        glow: 'none',
-    },
+const BLOCK_COLORS = {
+    'A': { bg: '#fbbf24', border: '#f59e0b', text: '#000', label: 'Apple St' },
+    'B': { bg: '#f8fafc', border: '#cbd5e1', text: '#334155', label: 'Baker Ave' },
+    'C': { bg: '#fda4af', border: '#f43f5e', text: '#fff', label: 'Cedar Ln' },
+    'D': { bg: '#fbbf24', border: '#f59e0b', text: '#000', label: 'Daisy Rd' },
+    'E': { bg: '#bef264', border: '#84cc16', text: '#334155', label: 'Elm Way' },
+    'F': { bg: '#a5f3fc', border: '#06b6d4', text: '#083344', label: 'Fig Blvd' },
+    'G': { bg: '#d8b4fe', border: '#a855f7', text: '#fff', label: 'Grove Ct' },
+    'W': { bg: '#f97316', border: '#ea580c', text: '#fff', label: 'Warehouse' },
+    'DEFAULT': { bg: '#94a3b8', border: '#475569', text: '#fff', label: 'Road' }
+};
+
+const STATE_STYLES = {
+    active: { glow: '0 0 20px rgba(99, 102, 241, 0.8)', scale: 1.2, zIndex: 10 },
+    candidate: { opacity: 0.8, scale: 0.95 },
+    visited: { opacity: 0.6, scale: 0.9 },
+    goal: { glow: '0 0 25px rgba(16, 185, 129, 0.7)', scale: 1.15 },
+    start: { glow: '0 0 25px rgba(249, 115, 22, 0.7)', scale: 1.15 },
 };
 
 export function BubbleNode({ data }) {
-    const { label, state, distance, heuristic, f_score } = data;
-    const cfg = STATE_CONFIG[state] || STATE_CONFIG.skipped;
-    const isActive = state === 'active';
+    const { label, state, distance, block, learningMode, heuristic, f_score, explanation, via, edge_time_cost, edge_distance } = data;
+    const [isHovered, setIsHovered] = useState(false);
+
+    const hasDistance = typeof distance === 'number' && Number.isFinite(distance);
+    const hasHeuristic = typeof heuristic === 'number' && Number.isFinite(heuristic);
+    const hasFScore = typeof f_score === 'number' && Number.isFinite(f_score);
+
+    const blockKey = block || (label === 'Warehouse' ? 'W' : 'DEFAULT');
+    const bColor = BLOCK_COLORS[blockKey] || BLOCK_COLORS.DEFAULT;
+    const sStyle = STATE_STYLES[state] || {};
+
+    const isWarehouse = label === 'Warehouse';
+    const isIntersection = !block && !isWarehouse;
+
+    // Schematic nodes are circular
+    const size = isIntersection ? 45 : 70;
 
     return (
         <div
-            className={isActive ? 'pulse-anim' : ''}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
             style={{
-                width: 120,
-                background: cfg.bg,
-                border: cfg.border,
-                borderRadius: 10,
-                boxShadow: cfg.glow,
-                color: cfg.textColor,
-                transition: 'all 0.3s ease',
-                overflow: 'hidden',
-                userSelect: 'none',
+                width: size,
+                height: size,
+                background: isHovered ? '#fff' : bColor.bg,
+                border: `2px solid ${isHovered ? '#6366f1' : bColor.border}`,
+                borderRadius: '50%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: isHovered ? '0 0 30px rgba(99, 102, 241, 0.6)' : (sStyle.glow || '0 2px 10px rgba(0,0,0,0.3)'),
+                transform: `scale(${isHovered ? 1.3 : (sStyle.scale || 1)})`,
+                opacity: sStyle.opacity || 1,
+                zIndex: isHovered ? 1000 : (sStyle.zIndex || 1),
+                transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                position: 'relative',
+                cursor: 'pointer'
             }}
         >
             <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
 
-            {/* Node name */}
+            {/* Main Label */}
             <div style={{
-                padding: '8px 8px 4px',
+                fontSize: isIntersection ? '8px' : '10px',
+                fontWeight: 900,
+                color: isHovered ? '#000' : bColor.text,
                 textAlign: 'center',
-                fontWeight: 700,
-                fontSize: '12px',
-                lineHeight: 1.2,
-                borderBottom: '1px solid rgba(255,255,255,0.15)'
+                lineHeight: 1.1,
+                padding: '0 4px',
+                wordBreak: 'break-word',
             }}>
-                {label}
+                {String(label).replace('St', '').replace('Ave', '').replace('Ln', '').replace('Rd', '').replace('Blvd', '').replace('Way', '').replace('Ct', '').trim()}
             </div>
 
-            {/* State badge */}
-            <div style={{
-                padding: '3px 6px',
-                background: cfg.badgeBg,
-                textAlign: 'center',
-                fontSize: '9px',
-                fontWeight: 700,
-                letterSpacing: '0.3px',
-            }}>
-                {cfg.badge}
-            </div>
-
-            {/* Score row */}
-            <div style={{
-                display: 'flex',
-                gap: 0,
-                borderTop: '1px solid rgba(255,255,255,0.12)',
-            }}>
-                <div style={{ flex: 1, padding: '4px 2px', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-                    <div style={{ fontSize: '8px', opacity: 0.7, marginBottom: 2 }}>Time</div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'monospace' }}>
-                        {distance !== undefined ? Number(distance).toFixed(1) + 's' : '?'}
+            {/* Active decision rationale */}
+            {state === 'active' && explanation && (
+                <div style={{
+                    position: 'absolute',
+                    top: size + 10,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 210,
+                    background: 'rgba(12, 18, 30, 0.82)',
+                    border: '1px solid rgba(148,163,184,0.22)',
+                    borderRadius: 12,
+                    padding: '8px 10px',
+                    color: '#d6e4ff',
+                    fontSize: '9px',
+                    lineHeight: 1.35,
+                    boxShadow: '0 14px 30px rgba(0,0,0,0.35)',
+                    backdropFilter: 'blur(10px)',
+                    pointerEvents: 'none',
+                    zIndex: 9999
+                }}>
+                    <div style={{ fontSize: '9px', fontWeight: 900, color: '#35d7e8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                        Why This Node
+                    </div>
+                    <div style={{ opacity: 0.95 }}>
+                        {String(explanation).slice(0, 140)}{String(explanation).length > 140 ? '…' : ''}
                     </div>
                 </div>
-                {heuristic !== undefined && heuristic !== null && (
-                    <div style={{ flex: 1, padding: '4px 2px', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-                        <div style={{ fontSize: '8px', opacity: 0.7, marginBottom: 2 }}>h</div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'monospace' }}>
-                            {Number(heuristic).toFixed(1)}
+            )}
+
+            {/* Hover Formula Pop-up (Glassmorphism + High Z-index) */}
+            {isHovered && hasDistance && (
+                <div style={{
+                    position: 'absolute',
+                    top: -70,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(15, 23, 42, 0.98)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    padding: '10px 16px',
+                    borderRadius: 14,
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 15px 40px rgba(0,0,0,0.8)',
+                    zIndex: 99999,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    pointerEvents: 'none',
+                    textAlign: 'center'
+                }}>
+                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '1px' }}>Efficiency Logic</div>
+                    <div style={{ fontSize: '15px', fontWeight: 900, color: '#fff', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+                        {hasHeuristic ? (
+                            <span>
+                                f = {distance.toFixed(1)} + {heuristic.toFixed(1)} ={' '}
+                                <span style={{ color: '#fbbf24' }}>{hasFScore ? f_score.toFixed(1) : '[]'}</span>
+                            </span>
+                        ) : (
+                            <span>cost = <span style={{ color: '#10b981' }}>{distance.toFixed(1)}s</span></span>
+                        )}
+                    </div>
+                    {(typeof via === 'string' || typeof edge_time_cost === 'number' || typeof edge_distance === 'number') && (
+                        <div style={{ fontSize: '10px', color: '#9fb0ca', fontWeight: 700 }}>
+                            {via ? `via ${displayNodeName(via)}` : ''}
+                            {typeof edge_time_cost === 'number' ? `  +${edge_time_cost.toFixed(2)}s` : ''}
+                            {typeof edge_distance === 'number' ? `  +${edge_distance.toFixed(1)}m` : ''}
                         </div>
-                    </div>
-                )}
-                {f_score !== undefined && f_score !== null && (
-                    <div style={{ flex: 1, padding: '4px 2px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '8px', opacity: 0.7, marginBottom: 2 }}>f</div>
-                        <div style={{ fontSize: '11px', fontWeight: 800, fontFamily: 'monospace' }}>
-                            {Number(f_score).toFixed(1)}
-                        </div>
-                    </div>
-                )}
-                {!heuristic && !f_score && (
-                    // For Dijkstra — show just the distance wider
-                    <div style={{ flex: 1, padding: '4px 2px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '8px', opacity: 0.5 }}>g-score</div>
-                    </div>
-                )}
-            </div>
+                    )}
+                </div>
+            )}
+
+            {/* Metric Badge (Static) */}
+            {!isHovered && state !== 'candidate' && hasDistance && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: -8,
+                    background: '#121826',
+                    color: '#fff',
+                    padding: '2px 5px',
+                    borderRadius: 4,
+                    fontSize: '8px',
+                    fontWeight: 800,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                }}>
+                    {distance.toFixed(1)}s
+                </div>
+            )}
 
             <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
         </div>
