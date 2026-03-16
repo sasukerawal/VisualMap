@@ -42,29 +42,54 @@ export function RouteStats() {
 
             <div className="card">
                 <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-blue)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>
-                    Route Statistics
+                    Post-Run Insights
                 </p>
 
                 <div style={{ borderTop: '1px solid var(--border)' }}>
                     <StatRow label="Algorithm" value={algoLabels[algorithm]} color="var(--accent-blue)" />
                     <div style={{ height: 1, background: 'var(--border)' }} />
+
+                    {/* Time vs Distance */}
                     <StatRow
-                        label="Total Distance"
-                        value={routeResult ? `${routeResult.total_distance.toFixed(1)} units` : null}
+                        label="Transit Time"
+                        value={routeResult?.total_time ? `${routeResult.total_time.toFixed(1)}s` : null}
                         mono
-                        color="var(--accent-green)"
+                        color="#d946ef"
                     />
                     <div style={{ height: 1, background: 'var(--border)' }} />
                     <StatRow
-                        label="Nodes Visited"
-                        value={routeResult?.visited_nodes?.length ?? null}
+                        label="Physical Distance"
+                        value={routeResult?.total_physical_distance ? `${routeResult.total_physical_distance.toFixed(1)}m` : null}
+                        mono
+                        color="#10b981"
+                    />
+
+                    {routeResult?.total_time && routeResult?.total_physical_distance && (
+                        <div style={{ marginTop: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(99,102,241,0.06)', borderRadius: 6, borderLeft: '3px solid #6366f1' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', marginBottom: 4 }}>
+                                Course of Path
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#475569', lineHeight: 1.5 }}>
+                                {routeResult.total_time < routeResult.total_physical_distance
+                                    ? "🚙 The algorithm routed out to the main perimeter roads. Even though it's physically longer, the higher speed limits save transit time."
+                                    : "🛵 The algorithm took a direct route through local roads and alleys. The physical distance was so short that detouring to a main road wasn't worth it."}
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{ height: 1, background: 'var(--border)' }} />
+
+                    {/* Performance */}
+                    <StatRow
+                        label="Nodes Explored"
+                        value={routeResult?.efficiency_metrics ? `${routeResult.efficiency_metrics.nodes_explored} / ${routeResult.efficiency_metrics.total_nodes_in_graph}` : null}
                         mono
                         color="var(--accent-orange)"
                     />
                     <div style={{ height: 1, background: 'var(--border)' }} />
                     <StatRow
                         label="Computation"
-                        value={routeResult ? `${routeResult.computation_time_ms.toFixed(2)} ms` : null}
+                        value={routeResult ? `${routeResult.computation_time_ms?.toFixed(2) || '0.00'} ms` : null}
                         mono
                     />
                     <div style={{ height: 1, background: 'var(--border)' }} />
@@ -75,6 +100,26 @@ export function RouteStats() {
                     />
                 </div>
             </div>
+
+            {/* Efficiency Box */}
+            {routeResult?.efficiency_metrics && (
+                <div style={{
+                    background: 'rgba(255,255,255,0.7)',
+                    borderRadius: 8, padding: '10px 12px',
+                    borderLeft: '4px solid var(--accent-orange)'
+                }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 6 }}>
+                        Efficiency Analysis
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-primary)' }}>
+                        <div><span style={{ color: '#64748b' }}>Time Complexity:</span> {routeResult.efficiency_metrics.time_complexity}</div>
+                        <div><span style={{ color: '#64748b' }}>Space:</span> {routeResult.efficiency_metrics.space_complexity}</div>
+                        <div style={{ marginTop: 4, lineHeight: 1.4, fontFamily: 'var(--font-sans)', fontStyle: 'italic', color: '#475569' }}>
+                            "{routeResult.efficiency_metrics.algorithm_efficiency}"
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Order mode */}
             <OrderModeToggle />

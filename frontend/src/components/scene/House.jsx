@@ -15,7 +15,12 @@ const HOUSE_COLORS = [
     '#e2dfd8', '#c0c5c1', '#9a8f82', '#b3b8b1', '#d4ccbf'
 ];
 
-export function House({ position, colorIndex, scale = [1, 1, 1] }) {
+import useStore from '../../store/useStore';
+
+export function House({ nodeId, position, colorIndex, scale = [1, 1, 1] }) {
+    const { addDestination, destinations, removeDestination } = useStore();
+    const isSelected = destinations.includes(nodeId);
+
     const wallColor = useMemo(() => HOUSE_COLORS[colorIndex % HOUSE_COLORS.length], [colorIndex]);
     const roofColor = useMemo(() => {
         // Slightly darken roof
@@ -29,18 +34,44 @@ export function House({ position, colorIndex, scale = [1, 1, 1] }) {
     const bH = 1.6 * sh;
     const bD = 2.2 * sd;
 
+    const handleClick = (e) => {
+        e.stopPropagation();
+        if (isSelected) {
+            removeDestination(nodeId);
+        } else {
+            addDestination(nodeId);
+        }
+    };
+
     return (
-        <group position={position}>
+        <group
+            position={position}
+            onClick={handleClick}
+            onPointerOver={(e) => {
+                e.stopPropagation();
+                document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={(e) => {
+                e.stopPropagation();
+                document.body.style.cursor = 'auto';
+            }}
+        >
             {/* Foundation / base */}
             <mesh receiveShadow position={[0, 0.05, 0]}>
                 <boxGeometry args={[bW + 0.2, 0.12, bD + 0.2]} />
-                <meshStandardMaterial color="#c8c0b0" roughness={0.9} />
+                <meshStandardMaterial color={isSelected ? "#00ff85" : "#c8c0b0"} roughness={0.9} />
             </mesh>
 
             {/* Main wall body */}
             <mesh castShadow receiveShadow position={[0, bH / 2, 0]}>
                 <boxGeometry args={[bW, bH, bD]} />
-                <meshStandardMaterial color={wallColor} roughness={0.7} metalness={0.05} />
+                <meshStandardMaterial
+                    color={wallColor}
+                    roughness={0.7}
+                    metalness={0.05}
+                    emissive={isSelected ? "#00ff85" : "#000000"}
+                    emissiveIntensity={isSelected ? 0.2 : 0}
+                />
             </mesh>
 
             {/* Peaked roof */}

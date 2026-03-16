@@ -78,19 +78,21 @@ export function DeliveryVan() {
 
         // Interpolate position
         const t = Math.min(progressRef.current, 1);
-        vanRef.current.position.lerpVectors(from, to, t);
+        const currentPos = new THREE.Vector3().lerpVectors(from, to, t);
+        vanRef.current.position.copy(currentPos);
 
         // Smooth rotation to face travel direction
-        const dir = to.clone().sub(from);
-        if (dir.length() > 0.001) {
+        const dir = to.clone().sub(from).normalize();
+        if (dir.lengthSq() > 0.0001) {
             const targetAngle = Math.atan2(dir.x, dir.z);
-            targetRotRef.current = targetAngle;
+
+            // Handle angle wrapping for smooth rotation
+            let deltaRot = targetAngle - vanRef.current.rotation.y;
+            while (deltaRot > Math.PI) deltaRot -= Math.PI * 2;
+            while (deltaRot < -Math.PI) deltaRot += Math.PI * 2;
+
+            vanRef.current.rotation.y += deltaRot * Math.min(delta * 12, 1);
         }
-        vanRef.current.rotation.y = THREE.MathUtils.lerp(
-            vanRef.current.rotation.y,
-            targetRotRef.current,
-            Math.min(delta * 8, 1)
-        );
     });
 
     const startPos = waypoints[0] ?? new THREE.Vector3(NODES.warehouse.pos[0], 0.35, NODES.warehouse.pos[2]);

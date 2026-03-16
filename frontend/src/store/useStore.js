@@ -42,12 +42,14 @@ const useStore = create((set, get) => ({
     deliveredNodes: [],   // node IDs the van has visited so far
     exploredNodes: [],    // nodes explored by the algorithm (for highlighting)
     exploredEdges: [],    // edges explored
+    currentStepIndex: 0,  // active step in the algorithm playback
 
     setIsPlaying: (v) => set({ isPlaying: v }),
     setIsPaused: (v) => set({ isPaused: v }),
     setAnimationSpeed: (v) => set({ animationSpeed: v }),
     setCurrentPathIndex: (i) => set({ currentPathIndex: i }),
     setCurrentSegment: (i) => set({ currentSegment: i }),
+    setCurrentStepIndex: (i) => set({ currentStepIndex: i }),
     addDelivered: (nodeId) => {
         if (!get().deliveredNodes.includes(nodeId)) {
             set({ deliveredNodes: [...get().deliveredNodes, nodeId] });

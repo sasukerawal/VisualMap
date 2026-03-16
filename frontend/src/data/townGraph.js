@@ -130,84 +130,111 @@ export const ADDRESS_NODES = Object.keys(NODES)
     .filter(k => NODES[k].type === 'address')
     .map(k => ({ id: k, ...NODES[k] }));
 
-export const EDGES = [
+const _RAW = [
     // Warehouse
-    ["warehouse", "n_wh", false],
+    ["warehouse", "n_wh", false, "main"],
 
     // North perimeter ONE-WAY W→E
-    ["n_wh", "n_A", true], ["n_A", "n_AB", true], ["n_AB", "n_B", true],
-    ["n_B", "n_BC", true], ["n_BC", "n_C", true], ["n_C", "n_CD", true],
-    ["n_CD", "n_D", true], ["n_D", "n_De", true],
+    ["n_wh", "n_A", true, "main"], ["n_A", "n_AB", true, "main"], ["n_AB", "n_B", true, "main"],
+    ["n_B", "n_BC", true, "main"], ["n_BC", "n_C", true, "main"], ["n_C", "n_CD", true, "main"],
+    ["n_CD", "n_D", true, "main"], ["n_D", "n_De", true, "main"],
 
     // East column ONE-WAY N→S
-    ["n_De", "m_e", true], ["m_e", "r1_e", true], ["r1_e", "s_e", true],
+    ["n_De", "m_e", true, "main"], ["m_e", "r1_e", true, "main"], ["r1_e", "s_e", true, "main"],
 
     // South perimeter ONE-WAY E→W
-    ["s_e", "s_G", true], ["s_G", "s_FG", true], ["s_FG", "s_F", true],
-    ["s_F", "s_EF", true], ["s_EF", "s_E", true], ["s_E", "s_w", true],
+    ["s_e", "s_G", true, "main"], ["s_G", "s_FG", true, "main"], ["s_FG", "s_F", true, "main"],
+    ["s_F", "s_EF", true, "main"], ["s_EF", "s_E", true, "main"], ["s_E", "s_w", true, "main"],
 
     // West column ONE-WAY S→N
-    ["s_w", "r1_w", true], ["r1_w", "m_w", true], ["m_w", "n_wh", true],
+    ["s_w", "r1_w", true, "main"], ["r1_w", "m_w", true, "main"], ["m_w", "n_wh", true, "main"],
 
     // Middle horizontal two-way
-    ["m_w", "m_A", false], ["m_A", "m_AB", false], ["m_AB", "m_B", false],
-    ["m_B", "m_BC", false], ["m_BC", "m_C", false], ["m_C", "m_CD", false],
-    ["m_CD", "m_D", false], ["m_D", "m_e", false],
+    ["m_w", "m_A", false, "local"], ["m_A", "m_AB", false, "local"], ["m_AB", "m_B", false, "local"],
+    ["m_B", "m_BC", false, "local"], ["m_BC", "m_C", false, "local"], ["m_C", "m_CD", false, "local"],
+    ["m_CD", "m_D", false, "local"], ["m_D", "m_e", false, "local"],
 
     // Middle→row1 connectors two-way
-    ["m_w", "r1_w", false], ["m_AB", "r1_EF", false], ["m_BC", "r1_FG", false],
-    ["m_e", "r1_e", false],
+    ["m_w", "r1_w", false, "local"], ["m_AB", "r1_EF", false, "local"], ["m_BC", "r1_FG", false, "local"],
+    ["m_e", "r1_e", false, "local"],
 
     // Row-1 north horizontal two-way
-    ["r1_w", "r1_E", false], ["r1_E", "r1_EF", false], ["r1_EF", "r1_F", false],
-    ["r1_F", "r1_FG", false], ["r1_FG", "r1_G", false], ["r1_G", "r1_e", false],
+    ["r1_w", "r1_E", false, "local"], ["r1_E", "r1_EF", false, "local"], ["r1_EF", "r1_F", false, "local"],
+    ["r1_F", "r1_FG", false, "local"], ["r1_FG", "r1_G", false, "local"], ["r1_G", "r1_e", false, "local"],
 
     // Inter-block verticals two-way
-    ["n_AB", "m_AB", false], ["n_BC", "m_BC", false], ["n_CD", "m_CD", false],
-    ["r1_EF", "s_EF", false], ["r1_FG", "s_FG", false],
+    ["n_AB", "m_AB", false, "local"], ["n_BC", "m_BC", false, "local"], ["n_CD", "m_CD", false, "local"],
+    ["r1_EF", "s_EF", false, "local"], ["r1_FG", "s_FG", false, "local"],
 
     // --- Block A Alley & Driveways ---
-    ["n_A", "drv_A1", false], ["drv_A1", "drv_A2", false], ["drv_A2", "drv_A3", false], ["drv_A3", "m_A", false],
-    ["drv_A1", "a1", false], ["drv_A1", "a4", false],
-    ["drv_A2", "a2", false], ["drv_A2", "a5", false],
-    ["drv_A3", "a3", false], ["drv_A3", "a6", false],
+    ["n_A", "drv_A1", false, "alley"], ["drv_A1", "drv_A2", false, "alley"], ["drv_A2", "drv_A3", false, "alley"], ["drv_A3", "m_A", false, "alley"],
+    ["drv_A1", "a1", false, "alley"], ["drv_A1", "a4", false, "alley"],
+    ["drv_A2", "a2", false, "alley"], ["drv_A2", "a5", false, "alley"],
+    ["drv_A3", "a3", false, "alley"], ["drv_A3", "a6", false, "alley"],
 
     // --- Block B Alley & Driveways ---
-    ["n_B", "drv_B1", false], ["drv_B1", "drv_B2", false], ["drv_B2", "drv_B3", false], ["drv_B3", "m_B", false],
-    ["drv_B1", "b1", false], ["drv_B1", "b4", false],
-    ["drv_B2", "b2", false], ["drv_B2", "b5", false],
-    ["drv_B3", "b3", false], ["drv_B3", "b6", false],
+    ["n_B", "drv_B1", false, "alley"], ["drv_B1", "drv_B2", false, "alley"], ["drv_B2", "drv_B3", false, "alley"], ["drv_B3", "m_B", false, "alley"],
+    ["drv_B1", "b1", false, "alley"], ["drv_B1", "b4", false, "alley"],
+    ["drv_B2", "b2", false, "alley"], ["drv_B2", "b5", false, "alley"],
+    ["drv_B3", "b3", false, "alley"], ["drv_B3", "b6", false, "alley"],
 
     // --- Block C Alley & Driveways ---
-    ["n_C", "drv_C1", false], ["drv_C1", "drv_C2", false], ["drv_C2", "drv_C3", false], ["drv_C3", "m_C", false],
-    ["drv_C1", "c1", false], ["drv_C1", "c4", false],
-    ["drv_C2", "c2", false], ["drv_C2", "c5", false],
-    ["drv_C3", "c3", false], ["drv_C3", "c6", false],
+    ["n_C", "drv_C1", false, "alley"], ["drv_C1", "drv_C2", false, "alley"], ["drv_C2", "drv_C3", false, "alley"], ["drv_C3", "m_C", false, "alley"],
+    ["drv_C1", "c1", false, "alley"], ["drv_C1", "c4", false, "alley"],
+    ["drv_C2", "c2", false, "alley"], ["drv_C2", "c5", false, "alley"],
+    ["drv_C3", "c3", false, "alley"], ["drv_C3", "c6", false, "alley"],
 
     // --- Block D Alley & Driveways ---
-    ["n_D", "drv_D1", false], ["drv_D1", "drv_D2", false], ["drv_D2", "drv_D3", false], ["drv_D3", "m_D", false],
-    ["drv_D1", "d1", false], ["drv_D1", "d4", false],
-    ["drv_D2", "d2", false], ["drv_D2", "d5", false],
-    ["drv_D3", "d3", false], ["drv_D3", "d6", false],
+    ["n_D", "drv_D1", false, "alley"], ["drv_D1", "drv_D2", false, "alley"], ["drv_D2", "drv_D3", false, "alley"], ["drv_D3", "m_D", false, "alley"],
+    ["drv_D1", "d1", false, "alley"], ["drv_D1", "d4", false, "alley"],
+    ["drv_D2", "d2", false, "alley"], ["drv_D2", "d5", false, "alley"],
+    ["drv_D3", "d3", false, "alley"], ["drv_D3", "d6", false, "alley"],
 
     // --- Block E Alley & Driveways ---
-    ["r1_E", "drv_E1", false], ["drv_E1", "drv_E2", false], ["drv_E2", "drv_E3", false], ["drv_E3", "s_E", false],
-    ["drv_E1", "e1", false], ["drv_E1", "e4", false],
-    ["drv_E2", "e2", false], ["drv_E2", "e5", false],
-    ["drv_E3", "e3", false], ["drv_E3", "e6", false],
+    ["r1_E", "drv_E1", false, "alley"], ["drv_E1", "drv_E2", false, "alley"], ["drv_E2", "drv_E3", false, "alley"], ["drv_E3", "s_E", false, "alley"],
+    ["drv_E1", "e1", false, "alley"], ["drv_E1", "e4", false, "alley"],
+    ["drv_E2", "e2", false, "alley"], ["drv_E2", "e5", false, "alley"],
+    ["drv_E3", "e3", false, "alley"], ["drv_E3", "e6", false, "alley"],
 
     // --- Block F Alley & Driveways ---
-    ["r1_F", "drv_F1", false], ["drv_F1", "drv_F2", false], ["drv_F2", "drv_F3", false], ["drv_F3", "s_F", false],
-    ["drv_F1", "f1", false], ["drv_F1", "f4", false],
-    ["drv_F2", "f2", false], ["drv_F2", "f5", false],
-    ["drv_F3", "f3", false], ["drv_F3", "f6", false],
+    ["r1_F", "drv_F1", false, "alley"], ["drv_F1", "drv_F2", false, "alley"], ["drv_F2", "drv_F3", false, "alley"], ["drv_F3", "s_F", false, "alley"],
+    ["drv_F1", "f1", false, "alley"], ["drv_F1", "f4", false, "alley"],
+    ["drv_F2", "f2", false, "alley"], ["drv_F2", "f5", false, "alley"],
+    ["drv_F3", "f3", false, "alley"], ["drv_F3", "f6", false, "alley"],
 
     // --- Block G Alley & Driveways ---
-    ["r1_G", "drv_G1", false], ["drv_G1", "drv_G2", false], ["drv_G2", "drv_G3", false], ["drv_G3", "s_G", false],
-    ["drv_G1", "g1", false], ["drv_G1", "g4", false],
-    ["drv_G2", "g2", false], ["drv_G2", "g5", false],
-    ["drv_G3", "g3", false], ["drv_G3", "g6", false],
+    ["r1_G", "drv_G1", false, "alley"], ["drv_G1", "drv_G2", false, "alley"], ["drv_G2", "drv_G3", false, "alley"], ["drv_G3", "s_G", false, "alley"],
+    ["drv_G1", "g1", false, "alley"], ["drv_G1", "g4", false, "alley"],
+    ["drv_G2", "g2", false, "alley"], ["drv_G2", "g5", false, "alley"],
+    ["drv_G3", "g3", false, "alley"], ["drv_G3", "g6", false, "alley"],
 ];
 
+function _speed(roadType) {
+    if (roadType === "main") return 1.5;
+    if (roadType === "local") return 1.0;
+    return 0.5; // alley
+}
+
+function _makeEdges() {
+    return _RAW.map(([a, b, one_way, road_type]) => {
+        const p1 = NODES[a].pos;
+        const p2 = NODES[b].pos;
+        const raw_dist = Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[2] - p2[2], 2));
+        const speed = _speed(road_type);
+        const time_cost = raw_dist / speed;
+        return {
+            source: a,
+            target: b,
+            time_cost,
+            raw_dist,
+            one_way,
+            speed_limit: speed,
+            road_type
+        };
+    });
+}
+
+export const EDGES = _makeEdges();
+
 // Helper to get one-way edges
-export const ONE_WAY_EDGES = EDGES.filter(e => e[2] === true);
+export const ONE_WAY_EDGES = EDGES.filter(e => e.one_way === true).map(e => [e.source, e.target, e.one_way]);

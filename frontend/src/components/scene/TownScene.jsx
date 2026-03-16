@@ -189,15 +189,17 @@ function SceneContent() {
             ))}
 
             {/* Roads */}
-            {EDGES.map(([a, b, ow], i) => (
+            {EDGES.map((edge, i) => (
                 <Road
                     key={`e-${i}`}
-                    from={NODES[a]?.pos}
-                    to={NODES[b]?.pos}
-                    oneWay={ow}
-                    isExplored={exploredSet.has(`${a}-${b}`) || exploredSet.has(`${b}-${a}`)}
-                    isFinal={finalEdgeSet.has(`${a}-${b}`)}
-                    isDriveway={addressNodeIds.has(a) || addressNodeIds.has(b)}
+                    from={NODES[edge.source]?.pos}
+                    to={NODES[edge.target]?.pos}
+                    oneWay={edge.one_way}
+                    speedLimit={edge.speed_limit}
+                    roadType={edge.road_type}
+                    isExplored={exploredSet.has(`${edge.source}-${edge.target}`) || exploredSet.has(`${edge.target}-${edge.source}`)}
+                    isFinal={finalEdgeSet.has(`${edge.source}-${edge.target}`)}
+                    isDriveway={addressNodeIds.has(edge.source) || addressNodeIds.has(edge.target)}
                 />
             ))}
 
@@ -205,6 +207,7 @@ function SceneContent() {
             {ADDRESS_NODES.map((node, i) => (
                 <House
                     key={node.id}
+                    nodeId={node.id}
                     position={[node.pos[0], 0, node.pos[2]]}
                     colorIndex={i}
                 />
@@ -248,12 +251,13 @@ function SceneContent() {
 
 export function TownScene() {
     const { cameraAngle } = useStore();
+
     return (
         <div style={{ width: '100%', height: '100%', background: '#87CEEB' }}>
             <Canvas
                 shadows
                 camera={{ fov: 50, position: [-5, 38, 50], near: 0.1, far: 200 }}
-                gl={{ antialias: true }}
+                gl={{ antialias: true, failIfMajorPerformanceCaveat: false }}
             >
                 <SceneContent />
             </Canvas>

@@ -151,100 +151,114 @@ NODES: Dict[str, dict] = {
 
 def _dist(n1: str, n2: str) -> float:
     p1, p2 = NODES[n1]["pos_3d"], NODES[n2]["pos_3d"]
-    return round(math.sqrt((p1[0]-p2[0])**2 + (p1[2]-p2[2])**2), 2)
+    # Return Euclidean distance correctly
+    return math.sqrt((p1[0]-p2[0])**2 + (p1[2]-p2[2])**2)
 
-# (src, tgt, one_way)  — one_way=True means directed src→tgt only
-_RAW: List[Tuple[str, str, bool]] = [
+# Edges are defined as: (src, tgt, one_way, road_type)
+# road_type implies speed limit: 'main' (fast), 'local' (medium), 'alley' (slow)
+_RAW: List[Tuple[str, str, bool, str]] = [
     # Warehouse
-    ("warehouse","n_wh", False),
+    ("warehouse","n_wh", False, "main"),
 
     # North perimeter ONE-WAY W→E
-    ("n_wh","n_A",True), ("n_A","n_AB",True), ("n_AB","n_B",True),
-    ("n_B","n_BC",True), ("n_BC","n_C",True), ("n_C","n_CD",True),
-    ("n_CD","n_D",True), ("n_D","n_De",True),
+    ("n_wh","n_A",True, "main"), ("n_A","n_AB",True, "main"), ("n_AB","n_B",True, "main"),
+    ("n_B","n_BC",True, "main"), ("n_BC","n_C",True, "main"), ("n_C","n_CD",True, "main"),
+    ("n_CD","n_D",True, "main"), ("n_D","n_De",True, "main"),
 
     # East column ONE-WAY N→S
-    ("n_De","m_e",True), ("m_e","r1_e",True), ("r1_e","s_e",True),
+    ("n_De","m_e",True, "main"), ("m_e","r1_e",True, "main"), ("r1_e","s_e",True, "main"),
 
     # South perimeter ONE-WAY E→W
-    ("s_e","s_G",True), ("s_G","s_FG",True), ("s_FG","s_F",True),
-    ("s_F","s_EF",True), ("s_EF","s_E",True), ("s_E","s_w",True),
+    ("s_e","s_G",True, "main"), ("s_G","s_FG",True, "main"), ("s_FG","s_F",True, "main"),
+    ("s_F","s_EF",True, "main"), ("s_EF","s_E",True, "main"), ("s_E","s_w",True, "main"),
 
     # West column ONE-WAY S→N
-    ("s_w","r1_w",True), ("r1_w","m_w",True), ("m_w","n_wh",True),
+    ("s_w","r1_w",True, "main"), ("r1_w","m_w",True, "main"), ("m_w","n_wh",True, "main"),
 
     # Middle horizontal two-way
-    ("m_w","m_A",False), ("m_A","m_AB",False), ("m_AB","m_B",False),
-    ("m_B","m_BC",False), ("m_BC","m_C",False), ("m_C","m_CD",False),
-    ("m_CD","m_D",False), ("m_D","m_e",False),
+    ("m_w","m_A",False, "local"), ("m_A","m_AB",False, "local"), ("m_AB","m_B",False, "local"),
+    ("m_B","m_BC",False, "local"), ("m_BC","m_C",False, "local"), ("m_C","m_CD",False, "local"),
+    ("m_CD","m_D",False, "local"), ("m_D","m_e",False, "local"),
 
     # Middle→row1 connectors two-way
-    ("m_w","r1_w",False), ("m_AB","r1_EF",False), ("m_BC","r1_FG",False),
-    ("m_e","r1_e",False),
+    ("m_w","r1_w",False, "local"), ("m_AB","r1_EF",False, "local"), ("m_BC","r1_FG",False, "local"),
+    ("m_e","r1_e",False, "local"),
 
     # Row-1 north horizontal two-way
-    ("r1_w","r1_E",False), ("r1_E","r1_EF",False), ("r1_EF","r1_F",False),
-    ("r1_F","r1_FG",False), ("r1_FG","r1_G",False), ("r1_G","r1_e",False),
+    ("r1_w","r1_E",False, "local"), ("r1_E","r1_EF",False, "local"), ("r1_EF","r1_F",False, "local"),
+    ("r1_F","r1_FG",False, "local"), ("r1_FG","r1_G",False, "local"), ("r1_G","r1_e",False, "local"),
 
     # Inter-block verticals two-way
-    ("n_AB","m_AB",False), ("n_BC","m_BC",False), ("n_CD","m_CD",False),
-    ("r1_EF","s_EF",False), ("r1_FG","s_FG",False),
+    ("n_AB","m_AB",False, "local"), ("n_BC","m_BC",False, "local"), ("n_CD","m_CD",False, "local"),
+    ("r1_EF","s_EF",False, "local"), ("r1_FG","s_FG",False, "local"),
 
     # --- Block A Alley & Driveways ---
-    ("n_A","drv_A1",False), ("drv_A1","drv_A2",False), ("drv_A2","drv_A3",False), ("drv_A3","m_A",False),
-    ("drv_A1","a1",False), ("drv_A1","a4",False),
-    ("drv_A2","a2",False), ("drv_A2","a5",False),
-    ("drv_A3","a3",False), ("drv_A3","a6",False),
+    ("n_A","drv_A1",False, "alley"), ("drv_A1","drv_A2",False, "alley"), ("drv_A2","drv_A3",False, "alley"), ("drv_A3","m_A",False, "alley"),
+    ("drv_A1","a1",False, "alley"), ("drv_A1","a4",False, "alley"),
+    ("drv_A2","a2",False, "alley"), ("drv_A2","a5",False, "alley"),
+    ("drv_A3","a3",False, "alley"), ("drv_A3","a6",False, "alley"),
 
     # --- Block B Alley & Driveways ---
-    ("n_B","drv_B1",False), ("drv_B1","drv_B2",False), ("drv_B2","drv_B3",False), ("drv_B3","m_B",False),
-    ("drv_B1","b1",False), ("drv_B1","b4",False),
-    ("drv_B2","b2",False), ("drv_B2","b5",False),
-    ("drv_B3","b3",False), ("drv_B3","b6",False),
+    ("n_B","drv_B1",False, "alley"), ("drv_B1","drv_B2",False, "alley"), ("drv_B2","drv_B3",False, "alley"), ("drv_B3","m_B",False, "alley"),
+    ("drv_B1","b1",False, "alley"), ("drv_B1","b4",False, "alley"),
+    ("drv_B2","b2",False, "alley"), ("drv_B2","b5",False, "alley"),
+    ("drv_B3","b3",False, "alley"), ("drv_B3","b6",False, "alley"),
 
     # --- Block C Alley & Driveways ---
-    ("n_C","drv_C1",False), ("drv_C1","drv_C2",False), ("drv_C2","drv_C3",False), ("drv_C3","m_C",False),
-    ("drv_C1","c1",False), ("drv_C1","c4",False),
-    ("drv_C2","c2",False), ("drv_C2","c5",False),
-    ("drv_C3","c3",False), ("drv_C3","c6",False),
+    ("n_C","drv_C1",False, "alley"), ("drv_C1","drv_C2",False, "alley"), ("drv_C2","drv_C3",False, "alley"), ("drv_C3","m_C",False, "alley"),
+    ("drv_C1","c1",False, "alley"), ("drv_C1","c4",False, "alley"),
+    ("drv_C2","c2",False, "alley"), ("drv_C2","c5",False, "alley"),
+    ("drv_C3","c3",False, "alley"), ("drv_C3","c6",False, "alley"),
 
     # --- Block D Alley & Driveways ---
-    ("n_D","drv_D1",False), ("drv_D1","drv_D2",False), ("drv_D2","drv_D3",False), ("drv_D3","m_D",False),
-    ("drv_D1","d1",False), ("drv_D1","d4",False),
-    ("drv_D2","d2",False), ("drv_D2","d5",False),
-    ("drv_D3","d3",False), ("drv_D3","d6",False),
+    ("n_D","drv_D1",False, "alley"), ("drv_D1","drv_D2",False, "alley"), ("drv_D2","drv_D3",False, "alley"), ("drv_D3","m_D",False, "alley"),
+    ("drv_D1","d1",False, "alley"), ("drv_D1","d4",False, "alley"),
+    ("drv_D2","d2",False, "alley"), ("drv_D2","d5",False, "alley"),
+    ("drv_D3","d3",False, "alley"), ("drv_D3","d6",False, "alley"),
 
     # --- Block E Alley & Driveways ---
-    ("r1_E","drv_E1",False), ("drv_E1","drv_E2",False), ("drv_E2","drv_E3",False), ("drv_E3","s_E",False),
-    ("drv_E1","e1",False), ("drv_E1","e4",False),
-    ("drv_E2","e2",False), ("drv_E2","e5",False),
-    ("drv_E3","e3",False), ("drv_E3","e6",False),
+    ("r1_E","drv_E1",False, "alley"), ("drv_E1","drv_E2",False, "alley"), ("drv_E2","drv_E3",False, "alley"), ("drv_E3","s_E",False, "alley"),
+    ("drv_E1","e1",False, "alley"), ("drv_E1","e4",False, "alley"),
+    ("drv_E2","e2",False, "alley"), ("drv_E2","e5",False, "alley"),
+    ("drv_E3","e3",False, "alley"), ("drv_E3","e6",False, "alley"),
 
     # --- Block F Alley & Driveways ---
-    ("r1_F","drv_F1",False), ("drv_F1","drv_F2",False), ("drv_F2","drv_F3",False), ("drv_F3","s_F",False),
-    ("drv_F1","f1",False), ("drv_F1","f4",False),
-    ("drv_F2","f2",False), ("drv_F2","f5",False),
-    ("drv_F3","f3",False), ("drv_F3","f6",False),
+    ("r1_F","drv_F1",False, "alley"), ("drv_F1","drv_F2",False, "alley"), ("drv_F2","drv_F3",False, "alley"), ("drv_F3","s_F",False, "alley"),
+    ("drv_F1","f1",False, "alley"), ("drv_F1","f4",False, "alley"),
+    ("drv_F2","f2",False, "alley"), ("drv_F2","f5",False, "alley"),
+    ("drv_F3","f3",False, "alley"), ("drv_F3","f6",False, "alley"),
 
     # --- Block G Alley & Driveways ---
-    ("r1_G","drv_G1",False), ("drv_G1","drv_G2",False), ("drv_G2","drv_G3",False), ("drv_G3","s_G",False),
-    ("drv_G1","g1",False), ("drv_G1","g4",False),
-    ("drv_G2","g2",False), ("drv_G2","g5",False),
-    ("drv_G3","g3",False), ("drv_G3","g6",False),
+    ("r1_G","drv_G1",False, "alley"), ("drv_G1","drv_G2",False, "alley"), ("drv_G2","drv_G3",False, "alley"), ("drv_G3","s_G",False, "alley"),
+    ("drv_G1","g1",False, "alley"), ("drv_G1","g4",False, "alley"),
+    ("drv_G2","g2",False, "alley"), ("drv_G2","g5",False, "alley"),
+    ("drv_G3","g3",False, "alley"), ("drv_G3","g6",False, "alley"),
 ]
 
+def _speed(road_type: str) -> float:
+    # Speed multipliers (higher means faster transit time)
+    if road_type == "main": return 1.5
+    if road_type == "local": return 1.0
+    return 0.5  # alley
+
 def _make_edges():
-    return [(a, b, _dist(a, b), ow) for a, b, ow in _RAW]
+    edges = []
+    for a, b, ow, road_type in _RAW:
+        dist = _dist(a, b)
+        speed = _speed(road_type)
+        time_cost = dist / speed
+        edges.append((a, b, time_cost, dist, ow, speed, road_type))
+    return edges
 
 EDGES = _make_edges()
 
 
 def _build_adjacency():
     adj = {n: [] for n in NODES}
-    for src, tgt, w, one_way in EDGES:
-        adj[src].append((tgt, w))
+    for src, tgt, time_cost, raw_dist, one_way, speed, r_type in EDGES:
+        adj[src].append((tgt, time_cost, raw_dist))
         if not one_way:
-            adj[tgt].append((src, w))
+            adj[tgt].append((src, time_cost, raw_dist))
     return adj
 
 ADJ = _build_adjacency()
@@ -257,7 +271,7 @@ def get_graph_data() -> dict:
             for nid, d in NODES.items()
         ],
         "edges": [
-            {"source": src, "target": tgt, "weight": w, "one_way": ow}
-            for src, tgt, w, ow in EDGES
+            {"source": src, "target": tgt, "time_cost": tc, "distance": rd, "one_way": ow, "road_type": r_type, "speed_limit": sp}
+            for src, tgt, tc, rd, ow, sp, r_type in EDGES
         ],
     }

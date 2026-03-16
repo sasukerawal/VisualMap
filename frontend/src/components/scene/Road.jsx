@@ -6,7 +6,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 
-export function Road({ from, to, oneWay = false, isExplored, isFinal, isDriveway = false }) {
+export function Road({ from, to, oneWay = false, isExplored, isFinal, isDriveway = false, roadType, speedLimit }) {
     if (!from || !to) return null;
 
     const { position, rotY, length } = useMemo(() => {
@@ -19,6 +19,9 @@ export function Road({ from, to, oneWay = false, isExplored, isFinal, isDriveway
     }, [from, to]);
 
     let roadColor = '#2c323c'; // realistic dark asphalt
+    if (roadType === 'main') roadColor = '#23302b'; // subtle dark green tint for fast roads
+    if (roadType === 'alley') roadColor = '#3a2b2b'; // subtle dark red tint for slow alleys
+
     let emissive = '#000';
     let emissiveInt = 0;
     let glowColor = '#00d470';
@@ -66,10 +69,15 @@ export function Road({ from, to, oneWay = false, isExplored, isFinal, isDriveway
                     {Array.from({ length: Math.floor(length / 1.5) }).map((_, i, arr) => {
                         const spacing = 1.5;
                         const zOff = (i - arr.length / 2) * spacing + spacing / 2;
+
+                        let centerLineColor = '#fcd730'; // standard yellow for local
+                        if (roadType === 'main') centerLineColor = '#10b981'; // green for fast
+                        if (roadType === 'alley') centerLineColor = '#ef4444'; // red for slow
+
                         return (
                             <mesh key={i} position={[0, 0, zOff]}>
                                 <boxGeometry args={[0.06, 0.01, 0.6]} />
-                                <meshStandardMaterial color="#fcd730" roughness={0.9} />
+                                <meshStandardMaterial color={centerLineColor} roughness={0.9} />
                             </mesh>
                         );
                     })}

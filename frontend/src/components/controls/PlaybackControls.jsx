@@ -171,7 +171,7 @@ export function PlaybackControls() {
 
             {!isPlaying && !routeResult && !error && (
                 <p style={{ fontSize: '11px', color: '#aab', textAlign: 'center', margin: 0 }}>
-                    Choose algo → click house pins → navigate
+                    Choose algo → 🏠 click a house → navigate
                 </p>
             )}
         </div>

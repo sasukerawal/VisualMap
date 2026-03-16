@@ -3,8 +3,11 @@
  * Improved layout with status bar, a better overlay, and clean compositing.
  */
 import { Suspense } from 'react';
+import { Group, Panel, Separator } from 'react-resizable-panels';
 import { TownScene } from './components/scene/TownScene';
 import { Dashboard } from './components/dashboard/Dashboard';
+import { PlaybackControls } from './components/controls/PlaybackControls';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import useStore from './store/useStore';
 import './index.css';
 
@@ -155,8 +158,8 @@ function SceneOverlays() {
                     backdropFilter: 'blur(10px)',
                     whiteSpace: 'nowrap',
                 }}>
-                    <span style={{ fontSize: '11px', color: '#557' }}>
-                        Click a 📍 pin to add a delivery stop
+                    <span style={{ fontSize: '11px', color: '#7a8aaa' }}>
+                        🏠 Click any <strong style={{ color: '#aab8cc' }}>house</strong> to add a delivery stop
                     </span>
                 </div>
             )}
@@ -166,17 +169,46 @@ function SceneOverlays() {
 
 export default function App() {
     return (
-        <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#070a12' }}>
-            {/* 3D Canvas area */}
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-                <SceneOverlays />
-                <Suspense fallback={<LoadingScreen />}>
-                    <TownScene />
-                </Suspense>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#070a12' }}>
+            {/* Main Area: Resizable Split */}
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+                <Group direction="horizontal">
+                    {/* Left Pane: 3D Simulation */}
+                    <Panel defaultSize={60} minSize={30}>
+                        <div style={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
+                            <ErrorBoundary>
+                                <SceneOverlays />
+                                <Suspense fallback={<LoadingScreen />}>
+                                    <TownScene />
+                                </Suspense>
+                            </ErrorBoundary>
+                        </div>
+                    </Panel>
+
+                    {/* Draggable Divider */}
+                    <Separator className="resize-handle-horizontal" />
+
+                    {/* Right Pane: Educational Console */}
+                    <Panel defaultSize={40} minSize={25}>
+                        <div style={{
+                            height: '100%',
+                            position: 'relative',
+                            zIndex: 10,
+                            background: 'linear-gradient(180deg, #1f2a3d 0%, #192338 100%)',
+                            borderLeft: '1px solid rgba(140,170,220,0.18)'
+                        }}>
+                            <ErrorBoundary>
+                                <Dashboard />
+                            </ErrorBoundary>
+                        </div>
+                    </Panel>
+                </Group>
             </div>
 
-            {/* Right dashboard panel */}
-            <Dashboard />
+            {/* Bottom Anchor: Unified Timeline Controller */}
+            <div style={{ background: '#121826', borderTop: '1px solid rgba(140,170,220,0.18)', padding: '10px 20px' }}>
+                <PlaybackControls />
+            </div>
         </div>
     );
 }

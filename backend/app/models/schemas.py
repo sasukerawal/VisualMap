@@ -54,10 +54,13 @@ class PathResponse(BaseModel):
     algorithm: str
     path: List[str]
     total_distance: float
+    total_time: Optional[float] = None
+    total_physical_distance: Optional[float] = None
     visited_nodes: List[str]
     exploration_order: List[ExplorationStep]
     edges_traversed: List[List[str]]
     computation_time_ms: float
+    efficiency_metrics: Optional[dict] = None
     segments: List[PathSegment]
 
 

@@ -1,236 +1,129 @@
 /**
- * Dashboard — right-side panel with all algorithm info + controls.
+ * Dashboard — right-side panel with resizable sub-sections.
+ * Uses react-resizable-panels (Group/Panel/Separator) for internal layout.
  */
 import { useState } from 'react';
+import { Group, Panel, Separator } from 'react-resizable-panels';
 import { AlgoSelector } from './AlgoSelector';
 import { RouteStats } from './RouteStats';
 import { DeliveryList } from './DeliveryList';
 import { DecisionTree } from './DecisionTree';
-import { PlaybackControls } from '../controls/PlaybackControls';
+import { TheoryTab } from './TheoryTab';
+import { TablesTab } from './TablesTab';
 import useStore from '../../store/useStore';
 import { NODES } from '../../data/townGraph';
 
-const TABS = ['Route', 'Algorithm', 'Tree'];
+const TABS = ['setup', 'theory', 'tables'];
+const TAB_LABELS = { setup: '⚙️ Setup', theory: '📖 Theory', tables: '📊 Tables' };
 
 export function Dashboard() {
-    const [activeTab, setActiveTab] = useState('Route');
-    const { showLabels, setShowLabels, cameraAngle, setCameraAngle, toggleDarkMode, destinations, routeResult } = useStore();
+    const [activeTab, setActiveTab] = useState('setup');
+    const { showLabels, setShowLabels, cameraAngle, setCameraAngle, destinations, routeResult } = useStore();
 
     return (
-        <aside style={{
-            width: '340px',
-            minWidth: '340px',
-            height: '100vh',
-            background: 'linear-gradient(180deg, #1f2a3d 0%, #192338 100%)',
-            borderLeft: '1px solid rgba(140,170,220,0.18)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            position: 'relative',
-            zIndex: 10,
-        }}>
+        <aside style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
 
             {/* Header */}
-            <div style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid rgba(140,170,220,0.14)',
-                background: 'rgba(91,156,246,0.07)',
-                flexShrink: 0,
-            }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(140,170,220,0.14)', background: 'rgba(91,156,246,0.07)', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                        <h1 style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.3px', color: '#e8ecf8', margin: 0 }}>
-                            🗺️ VisualMap
-                        </h1>
-                        <p style={{ fontSize: '11px', color: '#8892b0', margin: '2px 0 0' }}>
-                            3D Delivery Router
-                        </p>
+                        <h1 style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-0.3px', color: '#e8ecf8', margin: 0 }}>🗺️ VisualMap</h1>
+                        <p style={{ fontSize: '10px', color: '#8892b0', margin: '1px 0 0' }}>3D Algorithm Visualizer</p>
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                            className="btn btn-ghost btn-icon"
-                            title={showLabels ? 'Hide Labels' : 'Show Labels'}
-                            onClick={() => setShowLabels(!showLabels)}
-                            style={{ fontSize: '14px' }}
-                        >
+                    <div style={{ display: 'flex', gap: 5 }}>
+                        <button className="btn btn-ghost btn-icon" title={showLabels ? 'Hide Labels' : 'Show Labels'} onClick={() => setShowLabels(!showLabels)} style={{ fontSize: '13px' }}>
                             {showLabels ? '🏷️' : '🔇'}
                         </button>
-                        <button
-                            className="btn btn-ghost btn-icon"
-                            title="Toggle Camera"
-                            onClick={() => setCameraAngle(cameraAngle === 'perspective' ? 'top' : 'perspective')}
-                            style={{ fontSize: '14px' }}
-                        >
+                        <button className="btn btn-ghost btn-icon" title="Toggle Camera" onClick={() => setCameraAngle(cameraAngle === 'perspective' ? 'top' : 'perspective')} style={{ fontSize: '13px' }}>
                             {cameraAngle === 'perspective' ? '📐' : '🔭'}
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Algorithm Selector */}
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(99,120,255,0.1)', flexShrink: 0 }}>
-                <AlgoSelector />
-            </div>
+            {/* Main resizable vertical split */}
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                <Group direction="vertical">
 
-            {/* Tab navigation */}
-            <div style={{
-                display: 'flex',
-                padding: '0 20px',
-                gap: '4px',
-                borderBottom: '1px solid rgba(99,120,255,0.1)',
-                flexShrink: 0,
-                paddingTop: 12,
-                paddingBottom: 0,
-            }}>
-                {TABS.map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        style={{
-                            padding: '7px 14px',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            fontFamily: 'var(--font-sans)',
-                            cursor: 'pointer',
-                            border: 'none',
-                            borderBottom: activeTab === tab ? '2px solid var(--accent-blue)' : '2px solid transparent',
-                            background: 'transparent',
-                            color: activeTab === tab ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                            transition: 'all 0.2s',
-                            borderRadius: '4px 4px 0 0',
-                        }}
-                    >
-                        {tab}
-                    </button>
-                ))}
-            </div>
-
-            {/* Tab content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {activeTab === 'Route' && (
-                    destinations.length < 2 && !routeResult ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
-                            <div style={{ fontSize: '32px', opacity: 0.7 }}>📍</div>
-                            <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.6 }}>Click houses on the map to add delivery stops. Add at least 2 stops to see your route!</p>
-                            <button className="btn btn-primary" style={{ marginTop: 8, padding: '6px 16px', fontSize: '12px' }} onClick={() => {
-                                const arr = Object.keys(NODES).filter(k => NODES[k].type === 'address');
-                                const r1 = arr[Math.floor(Math.random() * arr.length)];
-                                let r2 = arr[Math.floor(Math.random() * arr.length)];
-                                while (r2 === r1) r2 = arr[Math.floor(Math.random() * arr.length)];
-                                useStore.getState().addDestination(r1);
-                                useStore.getState().addDestination(r2);
-                            }}>
-                                + Add 2 Random Stops
-                            </button>
+                    {/* Top Half: Decision Tree (resizable) */}
+                    <Panel defaultSize={48} minSize={25} style={{ overflow: 'hidden' }}>
+                        <div style={{ height: '100%', padding: '12px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                            <DecisionTree />
                         </div>
-                    ) : (
-                        <>
-                            <RouteStats />
-                            <DeliveryList />
-                        </>
-                    )
-                )}
-                {activeTab === 'Algorithm' && <AlgoInfo />}
-                {activeTab === 'Tree' && <DecisionTree />}
-            </div>
+                    </Panel>
 
-            {/* Playback controls — pinned to bottom */}
-            <div style={{ padding: '12px 20px 16px', borderTop: '1px solid rgba(99,120,255,0.15)', flexShrink: 0 }}>
-                <PlaybackControls />
+                    {/* Vertical Resize Handle */}
+                    <Separator className="resize-handle-vertical" />
+
+                    {/* Bottom Half: Tabbed Console (resizable) */}
+                    <Panel defaultSize={52} minSize={25} style={{ overflow: 'hidden' }}>
+                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                            {/* Tab Nav */}
+                            <div style={{ display: 'flex', padding: '8px 16px 0', gap: '3px', borderBottom: '1px solid rgba(99,120,255,0.12)', flexShrink: 0 }}>
+                                {TABS.map((tab) => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        style={{
+                                            padding: '6px 12px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            fontFamily: 'var(--font-sans)',
+                                            cursor: 'pointer',
+                                            border: 'none',
+                                            borderBottom: activeTab === tab ? '2px solid var(--accent-blue)' : '2px solid transparent',
+                                            background: 'transparent',
+                                            color: activeTab === tab ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                                            transition: 'all 0.15s',
+                                            borderRadius: '4px 4px 0 0',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        {TAB_LABELS[tab]}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Tab Content */}
+                            <div className="tab-transition" key={activeTab} style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {activeTab === 'setup' && (
+                                    <>
+                                        <AlgoSelector />
+                                        {destinations.length < 2 && !routeResult ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 10, textAlign: 'center', color: 'var(--text-secondary)', padding: '16px' }}>
+                                                <div style={{ fontSize: '28px', opacity: 0.7 }}>🏠</div>
+                                                <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.6 }}>Click any <strong>house</strong> in the 3D scene to add a delivery stop. You need at least 2 stops.</p>
+                                                <button
+                                                    className="btn btn-primary"
+                                                    style={{ marginTop: 4, padding: '6px 14px', fontSize: '12px', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                                                    onClick={() => {
+                                                        const arr = Object.keys(NODES).filter(k => NODES[k].type === 'address');
+                                                        const r1 = arr[Math.floor(Math.random() * arr.length)];
+                                                        let r2 = arr[Math.floor(Math.random() * arr.length)];
+                                                        while (r2 === r1) r2 = arr[Math.floor(Math.random() * arr.length)];
+                                                        useStore.getState().addDestination(r1);
+                                                        useStore.getState().addDestination(r2);
+                                                    }}
+                                                >
+                                                    🎲 Add 2 Random Stops
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <RouteStats />
+                                                <DeliveryList />
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                                {activeTab === 'theory' && <TheoryTab />}
+                                {activeTab === 'tables' && <TablesTab />}
+                            </div>
+                        </div>
+                    </Panel>
+
+                </Group>
             </div>
         </aside>
-    );
-}
-
-function AlgoInfo() {
-    const { algorithm } = useStore();
-
-    const info = {
-        dijkstra: {
-            name: "Dijkstra's Algorithm",
-            badge: 'Guaranteed Optimal',
-            badgeClass: 'badge-green',
-            complexity: 'O((V + E) log V)',
-            description: "Explores nodes greedily by minimum known distance from the source. Uses a priority queue to always settle the cheapest unvisited node next. Guarantees the shortest path in graphs with non-negative edge weights.",
-            howIt: [
-                'Initialize source distance = 0, all others = ∞',
-                'Push source into a min-priority queue',
-                'Pop the node with minimum distance',
-                'Relax all neighbors: update if shorter path found',
-                'Repeat until the target node is settled',
-            ],
-            bestFor: 'Road networks, GPS routing, non-negative weights',
-        },
-        astar: {
-            name: 'A* Search',
-            badge: 'Heuristic Optimal',
-            badgeClass: 'badge-blue',
-            complexity: 'O(E·log V) with good heuristic',
-            description: "Extends Dijkstra with a heuristic h(n) — an estimate of remaining cost to the goal. Uses f(n) = g(n) + h(n) to guide expansion toward the target. With an admissible (non-overestimating) heuristic, it is both optimal and faster than Dijkstra.",
-            howIt: [
-                'g(n) = known cost from start to n',
-                'h(n) = heuristic estimate to goal (here: Euclidean distance)',
-                'f(n) = g(n) + h(n) — priority queue key',
-                'Always expand node with lowest f(n)',
-                'Optimal if h(n) never overestimates real cost',
-            ],
-            bestFor: 'Grid pathfinding, game AI, directed search toward known goal',
-        },
-        bellman_ford: {
-            name: 'Bellman-Ford',
-            badge: 'Negative-Safe',
-            badgeClass: 'badge-orange',
-            complexity: 'O(V · E)',
-            description: "Relaxes all edges V-1 times to find shortest paths. Slower than Dijkstra but handles negative edge weights and detects negative cycles. Essential when edge costs can be negative (e.g., discounts, refunds).",
-            howIt: [
-                'Initialize source distance = 0, all others = ∞',
-                'For i = 1 to V-1 rounds:',
-                '  Relax all edges: if d[u] + w < d[v], update d[v]',
-                'After V-1 rounds, shortest paths are found',
-                'V-th round: if any edge relaxes → negative cycle',
-            ],
-            bestFor: 'Networks with negative costs, cycle detection, simpler implementation',
-        },
-    };
-
-    const d = info[algorithm];
-    if (!d) return null;
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="animate-fade-in">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#e8ecf8', margin: 0 }}>{d.name}</h3>
-                <span className={`badge ${d.badgeClass}`}>{d.badge}</span>
-            </div>
-
-            <div className="card" style={{ fontSize: '12px', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
-                {d.description}
-            </div>
-
-            <div className="card">
-                <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-blue)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                    Time Complexity
-                </p>
-                <code style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: '#e8ecf8' }}>{d.complexity}</code>
-            </div>
-
-            <div className="card">
-                <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-blue)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                    How It Works
-                </p>
-                <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {d.howIt.map((step, i) => (
-                        <li key={i} style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5, fontFamily: step.startsWith(' ') ? 'var(--font-mono)' : 'inherit' }}>
-                            {step}
-                        </li>
-                    ))}
-                </ol>
-            </div>
-
-            <div style={{ background: 'rgba(99,120,255,0.05)', border: '1px solid rgba(99,120,255,0.15)', borderRadius: 8, padding: '10px 12px' }}>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-blue)', marginBottom: 4 }}>Best For</p>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>{d.bestFor}</p>
-            </div>
-        </div>
     );
 }
