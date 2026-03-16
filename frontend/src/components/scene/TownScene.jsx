@@ -281,6 +281,7 @@ function SceneContent() {
                     isSelected={destinations.includes(node.id)}
                     isOnPath={finalPath.includes(node.id)}
                     showLabel={showLabels && !uiOverlayOpen}
+                    uiOverlayOpen={uiOverlayOpen}
                 />
             ))}
 

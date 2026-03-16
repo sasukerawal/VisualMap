@@ -10,7 +10,7 @@ import { shallow } from 'zustand/shallow';
 
 const PIN_BASE_Y = 3.2;
 
-export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, isSelected, isOnPath, showLabel }) {
+export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, isSelected, isOnPath, showLabel, uiOverlayOpen = false }) {
     const meshRef = useRef();
     const [hovered, setHovered] = useState(false);
     const { addDestination, removeDestination, isPlaying, deliveredNodes } = useStore(
@@ -53,6 +53,8 @@ export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, 
         pinColor = '#74b9ff';
         pinEmissive = '#5a9de8';
     }
+
+    const canShowLabel = !uiOverlayOpen && (showLabel || hovered || isSelected);
 
     return (
         <group position={[position[0], 0, position[2]]}>
@@ -99,7 +101,7 @@ export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, 
                 </mesh>
             )}
 
-            {(showLabel || hovered || isSelected) && (
+            {canShowLabel && (
                 <Html
                     center
                     distanceFactor={20}

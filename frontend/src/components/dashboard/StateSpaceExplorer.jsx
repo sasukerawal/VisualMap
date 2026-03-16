@@ -6,7 +6,7 @@ import ReactFlow, { Background, Controls, useReactFlow, ReactFlowProvider, getSt
 import 'reactflow/dist/style.css';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import useStore from '../../store/useStore';
-import { NODES, displayNodeName } from '../../data/townGraph';
+import { NODES, EDGES, displayNodeName } from '../../data/townGraph';
 import { BubbleNode } from './BubbleNode';
 
 // Custom Pulse Edge Component
@@ -35,7 +35,75 @@ function PulseEdge({ id, sourceX, sourceY, targetX, targetY, style, animated }) 
 }
 
 const edgeTypes = { pulse: PulseEdge };
-const nodeTypes = { bubble: BubbleNode };
+
+function MapDotNode({ data }) {
+    const isActive = data?.state === 'active';
+    const isVisited = data?.state === 'visited';
+
+    const bg = isActive ? '#fbbf24' : isVisited ? '#22c55e' : '#64748b';
+    const ring = isActive ? '0 0 0 6px rgba(251,191,36,0.16), 0 0 18px rgba(251,191,36,0.22)' : 'none';
+
+    return (
+        <div
+            style={{
+                width: 8,
+                height: 8,
+                borderRadius: 999,
+                background: bg,
+                boxShadow: ring,
+                border: '1px solid rgba(15,23,42,0.55)',
+                opacity: data?.opacity ?? 1,
+            }}
+        />
+    );
+}
+
+function MapGhostNode() {
+    // Invisible anchor so edges can still render to hidden houses.
+    return <div style={{ width: 2, height: 2, opacity: 0 }} />;
+}
+
+function MapPinNode({ data }) {
+    const color = data?.color || '#f97316';
+    const label = data?.label;
+    const isWarehouse = data?.kind === 'warehouse';
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            {label && (
+                <div
+                    style={{
+                        padding: '6px 10px',
+                        borderRadius: 999,
+                        background: isWarehouse ? 'rgba(249,115,22,0.16)' : 'rgba(12, 18, 30, 0.72)',
+                        border: `1px solid ${isWarehouse ? 'rgba(249,115,22,0.4)' : 'rgba(148,163,184,0.22)'}`,
+                        color: isWarehouse ? '#ffd0ad' : '#d6e4ff',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 16px 30px rgba(0,0,0,0.24)',
+                        backdropFilter: 'blur(10px)',
+                        pointerEvents: 'none',
+                    }}
+                >
+                    {label}
+                </div>
+            )}
+            <div
+                style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 999,
+                    background: color,
+                    boxShadow: `0 0 0 6px ${color}1f, 0 0 22px ${color}2a`,
+                    border: '1px solid rgba(15,23,42,0.55)',
+                }}
+            />
+        </div>
+    );
+}
+
+const nodeTypes = { bubble: BubbleNode, mapDot: MapDotNode, mapPin: MapPinNode, mapGhost: MapGhostNode };
 
 // Legend categories matching the reference image
 const LEGEND_ITEMS = [
@@ -169,6 +237,114 @@ function buildFlowGraph(stepsResult, currentStepIndex, learningMode, destination
     return { nodes: rfNodes, edges: rfEdges };
 }
 
+function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying) {
+    if (!stepsResult?.steps?.length) return { nodes: [], edges: [] };
+
+    const stepsSoFar = stepsResult.steps.slice(0, currentStepIndex + 1);
+    const activeNodeId = stepsSoFar[stepsSoFar.length - 1]?.node;
+    const visitedSet = new Set(stepsSoFar.map(s => s.node));
+
+    const activeRelaxed = new Set();
+    const activeStep = stepsResult.steps[currentStepIndex];
+    if (activeStep?.node && Array.isArray(activeStep.neighbors_updated)) {
+        const u = activeStep.node;
+        for (const nb of activeStep.neighbors_updated) {
+            const v = nb.node;
+            activeRelaxed.add(`${u}-${v}`);
+            activeRelaxed.add(`${v}-${u}`);
+        }
+    }
+
+    const finalEdgeSet = new Set();
+    (routeResult?.edges_traversed || []).forEach(([a, b]) => {
+        finalEdgeSet.add(`${a}-${b}`);
+        finalEdgeSet.add(`${b}-${a}`);
+    });
+    if (finalEdgeSet.size === 0 && routeResult?.path?.length) {
+        for (let i = 0; i < routeResult.path.length - 1; i++) {
+            const a = routeResult.path[i];
+            const b = routeResult.path[i + 1];
+            finalEdgeSet.add(`${a}-${b}`);
+            finalEdgeSet.add(`${b}-${a}`);
+        }
+    }
+
+    const selectedSet = new Set([...(destinations || []), 'warehouse']);
+
+    const scale = 14;
+    const rfNodes = Object.entries(NODES).map(([id, def]) => {
+        const x = def.pos[0] * scale;
+        const y = -def.pos[2] * scale;
+
+        const isSelectedHouse = def.type === 'address' && selectedSet.has(id);
+        const isHiddenHouse = def.type === 'address' && !selectedSet.has(id);
+
+        if (isHiddenHouse) {
+            return {
+                id,
+                type: 'mapGhost',
+                position: { x, y },
+                data: {},
+                draggable: false,
+                selectable: false,
+                style: { width: 2, height: 2, opacity: 0, pointerEvents: 'none' },
+            };
+        }
+
+        if (id === 'warehouse') {
+            return {
+                id,
+                type: 'mapPin',
+                position: { x, y },
+                data: { kind: 'warehouse', label: displayNodeName(id), color: '#f97316' },
+            };
+        }
+
+        if (isSelectedHouse) {
+            return {
+                id,
+                type: 'mapPin',
+                position: { x, y },
+                data: { kind: 'stop', label: displayNodeName(id), color: '#fbbf24' },
+            };
+        }
+
+        const state = id === activeNodeId ? 'active' : visitedSet.has(id) ? 'visited' : 'idle';
+        return {
+            id,
+            type: 'mapDot',
+            position: { x, y },
+            data: { state },
+            draggable: false,
+            selectable: false,
+        };
+    });
+
+    const rfEdges = EDGES.map((e) => {
+        const edgeId = `${e.source}-${e.target}`;
+        const isMain = e.road_type === 'main';
+        const isAlley = e.road_type === 'alley';
+        const isFinal = finalEdgeSet.has(edgeId);
+        const isActive = activeRelaxed.has(edgeId);
+
+        return {
+            id: edgeId,
+            source: e.source,
+            target: e.target,
+            type: isActive ? 'pulse' : 'straight',
+            animated: isTimelinePlaying && isActive,
+            style: {
+                stroke: isFinal ? '#3b82f6' : isActive ? '#fbbf24' : isMain ? 'rgba(148,163,184,0.35)' : isAlley ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.26)',
+                strokeWidth: isFinal ? 4.5 : isActive ? 2.5 : isMain ? 2 : 1.3,
+                opacity: isFinal ? 1 : isActive ? 0.95 : 0.7,
+                filter: isFinal ? 'drop-shadow(0 0 10px rgba(59,130,246,0.45))' : 'none',
+            },
+        };
+    });
+
+    return { nodes: rfNodes, edges: rfEdges };
+}
+
 function LegendOverlay({ dashboardMode }) {
     return (
         <div style={{
@@ -256,6 +432,48 @@ function FlowView({ nodes, edges, isExpanded, onClose, internalHeader = true }) 
     );
 }
 
+function MapFlowView({ nodes, edges, onClose }) {
+    const { fitView } = useReactFlow();
+
+    useEffect(() => {
+        fitView({ padding: 0.12, duration: 450 });
+    }, [nodes, fitView]);
+
+    return (
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#161f2f', flexShrink: 0 }}>
+                <div>
+                    <h2 style={{ margin: 0, fontSize: '18px', color: '#fbbf24', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Algorithm Topography Model</h2>
+                    <p style={{ fontSize: '10px', color: '#7a8aaa', fontWeight: 700, margin: '2px 0 0' }}>Ref: Neighborhood Map View (Selected Stops)</p>
+                </div>
+                {onClose && (
+                    <button onClick={onClose} className="btn-close" style={{ background: 'rgba(255,100,100,0.1)', color: '#ff6b6b', padding: '8px 16px', border: '1px solid rgba(255,100,100,0.2)', fontSize: '12px', fontWeight: 700, borderRadius: 8, cursor: 'pointer' }}>✕ Close</button>
+                )}
+            </div>
+            <div style={{ flex: 1, position: 'relative' }}>
+                <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
+                    defaultEdgeOptions={{ type: 'straight' }}
+                    fitView
+                    nodesDraggable
+                    nodesConnectable={false}
+                    elementsSelectable={false}
+                    panOnScroll
+                    proOptions={{ hideAttribution: true }}
+                    minZoom={0.05}
+                >
+                    <Background color="transparent" gap={30} size={1} />
+                    <ZoneOverlay />
+                    <LegendOverlay dashboardMode={false} />
+                </ReactFlow>
+            </div>
+        </div>
+    );
+}
+
 function ResetButton() {
     const { fitView } = useReactFlow();
     return (
@@ -293,9 +511,14 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
         }
     }, [isExpanded, dashboardMode]);
 
-    const { nodes, edges } = useMemo(() =>
+    const { nodes: schematicNodes, edges: schematicEdges } = useMemo(() =>
         buildFlowGraph(stepsResult, currentStepIndex, learningMode, destinations, routeResult, isTimelinePlaying),
         [stepsResult, currentStepIndex, learningMode, destinations, routeResult, isTimelinePlaying]
+    );
+
+    const { nodes: mapNodes, edges: mapEdges } = useMemo(() =>
+        buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying),
+        [stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying]
     );
 
     if (!stepsResult) {
@@ -314,7 +537,7 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
     if (dashboardMode) {
         return (
             <ReactFlowProvider>
-                <FlowView nodes={nodes} edges={edges} isExpanded={true} onClose={null} internalHeader={false} />
+                <FlowView nodes={schematicNodes} edges={schematicEdges} isExpanded={true} onClose={null} internalHeader={false} />
             </ReactFlowProvider>
         );
     }
@@ -341,7 +564,7 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
             </div>
 
             <div style={{ flex: 1, minHeight: '120px', background: 'rgba(0,0,0,0.5)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', position: 'relative' }}>
-                <FlowView nodes={nodes} edges={edges} isExpanded={isExpanded} onClose={onClose} internalHeader={internalHeader} />
+                <FlowView nodes={schematicNodes} edges={schematicEdges} isExpanded={isExpanded} onClose={onClose} internalHeader={internalHeader} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
@@ -368,7 +591,7 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
                     <div style={{ width: '100%', maxWidth: '1400px', height: '90vh', background: '#0b0e14', borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 100px rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column' }}>
                         <ReactFlowProvider>
                             <div style={{ flex: 1, minHeight: 0 }}>
-                                <FlowView nodes={nodes} edges={edges} isExpanded={true} onClose={() => setIsExpanded(false)} />
+                                <MapFlowView nodes={mapNodes} edges={mapEdges} onClose={() => setIsExpanded(false)} />
                             </div>
                             <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,14,24,0.92)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
