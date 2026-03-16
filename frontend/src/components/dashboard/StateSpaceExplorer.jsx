@@ -237,15 +237,16 @@ function buildFlowGraph(stepsResult, currentStepIndex, learningMode, destination
     return { nodes: rfNodes, edges: rfEdges };
 }
 
-function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying) {
-    if (!stepsResult?.steps?.length) return { nodes: [], edges: [] };
+function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, selectedOnly) {
+    const hasSteps = !!stepsResult?.steps?.length;
+    const safeIndex = hasSteps ? Math.min(Math.max(currentStepIndex || 0, 0), stepsResult.steps.length - 1) : 0;
 
-    const stepsSoFar = stepsResult.steps.slice(0, currentStepIndex + 1);
-    const activeNodeId = stepsSoFar[stepsSoFar.length - 1]?.node;
+    const stepsSoFar = hasSteps ? stepsResult.steps.slice(0, safeIndex + 1) : [];
+    const activeNodeId = hasSteps ? stepsSoFar[stepsSoFar.length - 1]?.node : null;
     const visitedSet = new Set(stepsSoFar.map(s => s.node));
 
     const activeRelaxed = new Set();
-    const activeStep = stepsResult.steps[currentStepIndex];
+    const activeStep = hasSteps ? stepsResult.steps[safeIndex] : null;
     if (activeStep?.node && Array.isArray(activeStep.neighbors_updated)) {
         const u = activeStep.node;
         for (const nb of activeStep.neighbors_updated) {
@@ -277,7 +278,7 @@ function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult,
         const y = -def.pos[2] * scale;
 
         const isSelectedHouse = def.type === 'address' && selectedSet.has(id);
-        const isHiddenHouse = def.type === 'address' && !selectedSet.has(id);
+        const isHiddenHouse = def.type === 'address' && !selectedSet.has(id) && !!selectedOnly;
 
         if (isHiddenHouse) {
             return {
@@ -306,6 +307,17 @@ function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult,
                 type: 'mapPin',
                 position: { x, y },
                 data: { kind: 'stop', label: displayNodeName(id), color: '#fbbf24' },
+            };
+        }
+
+        if (def.type === 'address' && !selectedOnly) {
+            return {
+                id,
+                type: 'mapDot',
+                position: { x, y },
+                data: { state: 'idle', opacity: 0.55 },
+                draggable: false,
+                selectable: false,
             };
         }
 
@@ -432,7 +444,7 @@ function FlowView({ nodes, edges, isExpanded, onClose, internalHeader = true }) 
     );
 }
 
-function MapFlowView({ nodes, edges, onClose }) {
+function MapFlowView({ nodes, edges, onClose, internalHeader = true, dashboardMode = false }) {
     const { fitView } = useReactFlow();
 
     useEffect(() => {
@@ -441,15 +453,17 @@ function MapFlowView({ nodes, edges, onClose }) {
 
     return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#161f2f', flexShrink: 0 }}>
-                <div>
-                    <h2 style={{ margin: 0, fontSize: '18px', color: '#fbbf24', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Algorithm Topography Model</h2>
-                    <p style={{ fontSize: '10px', color: '#7a8aaa', fontWeight: 700, margin: '2px 0 0' }}>Ref: Neighborhood Map View (Selected Stops)</p>
+            {internalHeader && (
+                <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#161f2f', flexShrink: 0 }}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '18px', color: '#fbbf24', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Algorithm Topography Model</h2>
+                        <p style={{ fontSize: '10px', color: '#7a8aaa', fontWeight: 700, margin: '2px 0 0' }}>Ref: Neighborhood Map View (Stops + Roads)</p>
+                    </div>
+                    {onClose && (
+                        <button onClick={onClose} className="btn-close" style={{ background: 'rgba(255,100,100,0.1)', color: '#ff6b6b', padding: '8px 16px', border: '1px solid rgba(255,100,100,0.2)', fontSize: '12px', fontWeight: 700, borderRadius: 8, cursor: 'pointer' }}>✕ Close</button>
+                    )}
                 </div>
-                {onClose && (
-                    <button onClick={onClose} className="btn-close" style={{ background: 'rgba(255,100,100,0.1)', color: '#ff6b6b', padding: '8px 16px', border: '1px solid rgba(255,100,100,0.2)', fontSize: '12px', fontWeight: 700, borderRadius: 8, cursor: 'pointer' }}>✕ Close</button>
-                )}
-            </div>
+            )}
             <div style={{ flex: 1, position: 'relative' }}>
                 <ReactFlow
                     nodes={nodes}
@@ -467,7 +481,7 @@ function MapFlowView({ nodes, edges, onClose }) {
                 >
                     <Background color="transparent" gap={30} size={1} />
                     <ZoneOverlay />
-                    <LegendOverlay dashboardMode={false} />
+                    <LegendOverlay dashboardMode={dashboardMode || !internalHeader} />
                 </ReactFlow>
             </div>
         </div>
@@ -511,33 +525,18 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
         }
     }, [isExpanded, dashboardMode]);
 
-    const { nodes: schematicNodes, edges: schematicEdges } = useMemo(() =>
-        buildFlowGraph(stepsResult, currentStepIndex, learningMode, destinations, routeResult, isTimelinePlaying),
-        [stepsResult, currentStepIndex, learningMode, destinations, routeResult, isTimelinePlaying]
-    );
+    const hasSteps = !!stepsResult?.steps?.length;
 
     const { nodes: mapNodes, edges: mapEdges } = useMemo(() =>
-        buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying),
-        [stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying]
+        buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, hasSteps),
+        [stepsResult, currentStepIndex, destinations, routeResult, isTimelinePlaying, hasSteps]
     );
-
-    if (!stepsResult) {
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12, padding: '28px 14px', textAlign: 'center' }}>
-                <div style={{ fontSize: '36px', animation: 'float 3s ease-in-out infinite' }}>📊</div>
-                <div style={{ maxWidth: '200px' }}>
-                    <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.2px' }}>Topography Standby</p>
-                    <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#7a8aaa', lineHeight: 1.5 }}>Schematic topography will map the algorithm's search patterns once a simulation begins.</p>
-                </div>
-            </div>
-        );
-    }
 
     // In Dashboard Mode, we just return the FlowView directly within its provider
     if (dashboardMode) {
         return (
             <ReactFlowProvider>
-                <FlowView nodes={schematicNodes} edges={schematicEdges} isExpanded={true} onClose={null} internalHeader={false} />
+                <MapFlowView nodes={mapNodes} edges={mapEdges} onClose={null} internalHeader={false} dashboardMode />
             </ReactFlowProvider>
         );
     }
@@ -564,7 +563,7 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
             </div>
 
             <div style={{ flex: 1, minHeight: '120px', background: 'rgba(0,0,0,0.5)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', position: 'relative' }}>
-                <FlowView nodes={schematicNodes} edges={schematicEdges} isExpanded={isExpanded} onClose={onClose} internalHeader={internalHeader} />
+                <MapFlowView nodes={mapNodes} edges={mapEdges} onClose={onClose} internalHeader={false} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
@@ -572,10 +571,14 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <span style={{ fontSize: '9px', fontWeight: 800, color: '#7a8aaa', textTransform: 'uppercase' }}>Search Progress</span>
                         <span style={{ fontSize: '10px', color: '#fbbf24', fontWeight: 800 }}>
-                            Consideration {currentStepIndex + 1} / {stepsResult.steps.length}
+                            {hasSteps ? `Consideration ${currentStepIndex + 1} / ${stepsResult.steps.length}` : 'Ready (start simulation)'}
                         </span>
                     </div>
-                    <input type="range" min="0" max={stepsResult.steps.length - 1} value={currentStepIndex} onChange={(e) => setCurrentStepIndex(Number(e.target.value))} style={{ cursor: 'pointer', width: '100%', accentColor: '#fbbf24', height: '6px' }} />
+                    {hasSteps ? (
+                        <input type="range" min="0" max={stepsResult.steps.length - 1} value={currentStepIndex} onChange={(e) => setCurrentStepIndex(Number(e.target.value))} style={{ cursor: 'pointer', width: '100%', accentColor: '#fbbf24', height: '6px' }} />
+                    ) : (
+                        <div style={{ height: 6, borderRadius: 999, background: 'rgba(148,163,184,0.14)' }} />
+                    )}
                 </div>
             </div>
         </div>
