@@ -86,11 +86,17 @@ class AlgoStep(BaseModel):
     action: str
     node: str
     distance: float
+    raw_distance: Optional[float] = None
+    fuel_cost: Optional[float] = None
     heuristic: Optional[float] = None   # A* h(n)
     f_score: Optional[float] = None     # A* f(n)
+    f_fuel: Optional[float] = None      # Fuel-aware A* f_fuel(n)
     round_num: Optional[int] = None     # Bellman-Ford relaxation round
     neighbors_updated: List[dict] = []
     description: str
+    explanation: Optional[str] = None
+    active_line: Optional[int] = None
+    math_breakdown: Optional[dict] = None
 
 
 class StepsResponse(BaseModel):

@@ -13,12 +13,37 @@ from app.graph.town_graph import NODES
 
 
 def _heuristic(node_id: str, target_id: str) -> float:
-    """Euclidean distance heuristic between two nodes in 3D world, converted to time."""
+    """
+    Fuel heuristic: straight-line physical distance (admissible).
+
+    We intentionally do NOT add elevation penalty here to avoid overestimating fuel.
+    """
     p1 = NODES[node_id]["pos_3d"]
     p2 = NODES[target_id]["pos_3d"]
     raw_dist = math.sqrt((p1[0] - p2[0]) ** 2 + (p1[2] - p2[2]) ** 2)
-    # Admissible assumption: assume we can travel at max speed (1.5) all the way
-    return raw_dist / 1.5
+    return raw_dist
+
+
+UPHILL_PENALTY = 0.35
+DOWNHILL_REGEN = 0.12
+MIN_FUEL_MULT = 0.55
+
+
+def _edge_fuel_cost(u: str, v: str, phys_dist: float) -> Tuple[float, float, float]:
+    """
+    Fuel proxy model:
+      base fuel proportional to distance
+      uphill increases fuel (penalty)
+      downhill slightly reduces fuel (regen), but never below MIN_FUEL_MULT
+
+    Returns: (fuel_cost, elev_delta, fuel_multiplier)
+    """
+    eu = float(NODES[u].get("elev", 0.0))
+    ev = float(NODES[v].get("elev", 0.0))
+    delta = ev - eu
+    mult = 1.0 + UPHILL_PENALTY * max(0.0, delta) - DOWNHILL_REGEN * max(0.0, -delta)
+    mult = max(MIN_FUEL_MULT, mult)
+    return phys_dist * mult, delta, mult
 
 
 def astar(
@@ -35,17 +60,20 @@ def astar(
             exploration_order, edges_traversed, steps
         }
     """
-    # Line 1: Initialize
-    g: Dict[str, float] = {n: float("inf") for n in graph}
+    # Line 1: Initialize (we optimize fuel but still track time + physical distance)
+    g_fuel: Dict[str, float] = {n: float("inf") for n in graph}
+    g_time: Dict[str, float] = {n: float("inf") for n in graph}
     g_raw: Dict[str, float] = {n: float("inf") for n in graph}
-    g[start] = 0.0
+    g_fuel[start] = 0.0
+    g_time[start] = 0.0
     g_raw[start] = 0.0
-    f: Dict[str, float] = {n: float("inf") for n in graph}
-    f[start] = _heuristic(start, end)
+
+    f_fuel: Dict[str, float] = {n: float("inf") for n in graph}
+    f_fuel[start] = _heuristic(start, end)
     prev: Dict[str, Optional[str]] = {n: None for n in graph}
 
     # Line 2: Push start
-    open_heap: List[Tuple[float, str]] = [(f[start], start)]
+    open_heap: List[Tuple[float, str]] = [(f_fuel[start], start)]
     closed: set = set()
 
     visited: List[str] = []
@@ -71,26 +99,34 @@ def astar(
             if v in closed:
                 continue
             # Line 7: Relaxation check
-            tentative_g = g[u] + time_cost
+            edge_fuel, elev_delta, fuel_mult = _edge_fuel_cost(u, v, phys_dist)
+            tentative_fuel = g_fuel[u] + edge_fuel
+            tentative_time = g_time[u] + time_cost
             tentative_raw = g_raw[u] + phys_dist
-            if tentative_g < g[v]:
-                g[v] = tentative_g
+
+            if tentative_fuel < g_fuel[v]:
+                g_fuel[v] = tentative_fuel
+                g_time[v] = tentative_time
                 g_raw[v] = tentative_raw
                 h_v = _heuristic(v, end)
-                f[v] = tentative_g + h_v
+                f_fuel[v] = tentative_fuel + h_v
                 prev[v] = u
                 # Line 8: Push to open list
-                heapq.heappush(open_heap, (f[v], v))
+                heapq.heappush(open_heap, (f_fuel[v], v))
                 neighbors_updated.append({
                     "node": v,
                     "from_node": u,
                     "edge_time_cost": round(time_cost, 2),
                     "edge_distance": round(phys_dist, 2),
-                    "g": round(tentative_g, 2),
-                    "new_dist": round(tentative_g, 2),
+                    "edge_fuel_cost": round(edge_fuel, 2),
+                    "elev_delta": round(elev_delta, 3),
+                    "fuel_mult": round(fuel_mult, 3),
+                    "g": round(tentative_time, 2),
+                    "new_dist": round(tentative_time, 2),
                     "new_raw_dist": round(tentative_raw, 2),
+                    "new_fuel_cost": round(tentative_fuel, 2),
                     "h": round(h_v, 2),
-                    "f": round(f[v], 2),
+                    "f": round(f_fuel[v], 2),
                     "relaxed": True
                 })
 
@@ -98,21 +134,24 @@ def astar(
         exploration_order.append({
             "step": step_counter,
             "node": u,
-            "distance": round(g[u], 2), # time cost
+            "distance": round(g_time[u], 2), # time so far (seconds proxy)
             "raw_distance": round(g_raw[u], 2),
+            "fuel_cost": round(g_fuel[u], 2),
             "heuristic": round(h_u, 2),
-            "f_score": round(f[u], 2),
+            "f_score": round(g_time[u] + (h_u / 1.5), 2),
+            "f_fuel": round(f_fuel[u], 2),
             "action": "settle",
             "active_line": 4, # Pop node
-            "explanation": f"Selecting '{NODES[u].get('label', u)}' because it has the lowest total estimated time (f={f[u]:.2f}s).",
+            "explanation": f"Selecting '{NODES[u].get('label', u)}' because it has the lowest estimated fuel cost (f_fuel={f_fuel[u]:.2f}).",
             "math_breakdown": {
-                "g": round(g[u], 2),
+                "time_g": round(g_time[u], 2),
+                "fuel_g": round(g_fuel[u], 2),
                 "h": round(h_u, 2),
-                "f": round(f[u], 2)
+                "f_fuel": round(f_fuel[u], 2)
             },
             "description": (
                 f"Step {step_counter}: Expand '{u}' — "
-                f"g={g[u]:.2f}, h={h_u:.2f}, f={f[u]:.2f}. "
+                f"time={g_time[u]:.2f}s, fuel={g_fuel[u]:.2f}, h={h_u:.2f}, f_fuel={f_fuel[u]:.2f}. "
                 f"Relaxed {len(neighbors_updated)} neighbor(s)."
             ),
             "neighbors_updated": neighbors_updated,
@@ -137,13 +176,16 @@ def astar(
         path = []
 
     edges_traversed = [[path[i], path[i + 1]] for i in range(len(path) - 1)]
-    total_dist = g[end] if g[end] != float("inf") else -1
+    total_time = g_time[end] if g_time[end] != float("inf") else -1
+    total_fuel = g_fuel[end] if g_fuel[end] != float("inf") else -1
     total_raw = g_raw[end] if g_raw[end] != float("inf") else -1
 
     return {
         "path": path,
-        "total_distance": round(total_dist, 2),
-        "total_time": round(total_dist, 2), 
+        # For A*, we treat "total_distance" as the optimized cost (fuel proxy).
+        "total_distance": round(total_fuel, 2),
+        "total_time": round(total_time, 2),
+        "total_fuel": round(total_fuel, 2),
         "total_physical_distance": round(total_raw, 2),
         "visited_nodes": visited,
         "exploration_order": exploration_order,
@@ -167,8 +209,10 @@ def _build_steps(exploration_order: list) -> list:
             "node": e["node"],
             "distance": e["distance"],
             "raw_distance": e.get("raw_distance"),
+            "fuel_cost": e.get("fuel_cost"),
             "heuristic": e.get("heuristic"),
             "f_score": e.get("f_score"),
+            "f_fuel": e.get("f_fuel"),
             "neighbors_updated": e["neighbors_updated"],
             "description": e["description"],
             "active_line": e.get("active_line"),

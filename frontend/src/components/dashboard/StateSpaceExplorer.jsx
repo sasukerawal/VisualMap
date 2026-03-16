@@ -92,6 +92,7 @@ function MapDotNode({ data }) {
                                     <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 10, color: '#cbd5e1' }}>
                                         <div>+{nb.edgeTime} s</div>
                                         <div>+{nb.edgeDist} u</div>
+                                        {nb.edgeFuel !== null && <div>+{nb.edgeFuel} fuel</div>}
                                     </div>
                                 </div>
                             ))}
@@ -338,13 +339,17 @@ function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult,
         const nodeLabel = displayNodeName(activeStep.node);
         const g = fmt(activeStep.distance);
         const raw = fmt(activeStep.raw_distance);
+        const fuel = fmt(activeStep.fuel_cost);
         const h = fmt(activeStep.heuristic);
         const f = fmt(activeStep.f_score);
+        const fFuel = fmt(activeStep.f_fuel);
 
         let summary = `g(time)=${g}s`;
         if (raw !== '—') summary += `, dist=${raw}u`;
+        if (fuel !== '—') summary += `, fuel=${fuel}`;
         if (h !== '—') summary += `, h=${h}`;
         if (f !== '—') summary += `, f=${f}`;
+        if (fFuel !== '—') summary += `, f_fuel=${fFuel}`;
 
         const reason = activeStep.explanation || activeStep.description || `Expanded next node with the best priority (${(algorithm || '').toUpperCase() || 'ALGO'}).`;
 
@@ -352,12 +357,16 @@ function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult,
             const label = displayNodeName(nb.node);
             const edgeTime = fmt(nb.edge_time_cost);
             const edgeDist = fmt(nb.edge_distance);
+            const edgeFuel = typeof nb.edge_fuel_cost === 'number' && Number.isFinite(nb.edge_fuel_cost) ? fmt(nb.edge_fuel_cost) : null;
+            const elevDelta = typeof nb.elev_delta === 'number' && Number.isFinite(nb.elev_delta) ? nb.elev_delta : null;
             const newTime = fmt(nb.new_dist ?? nb.g);
             const newRaw = fmt(nb.new_raw_dist);
+            const newFuel = fmt(nb.new_fuel_cost);
 
+            const slopeNote = elevDelta === null ? '' : elevDelta > 0 ? ` (uphill +${elevDelta.toFixed(2)})` : elevDelta < 0 ? ` (downhill ${elevDelta.toFixed(2)})` : '';
             const note = nb.relaxed
-                ? `Updated best time to ${newTime}s${newRaw !== '—' ? ` (dist ${newRaw}u)` : ''}`
-                : `Kept existing best (candidate not improved)`;
+                ? `Updated best: time ${newTime}s${newRaw !== '—' ? `, dist ${newRaw}u` : ''}${newFuel !== '—' ? `, fuel ${newFuel}` : ''}${slopeNote}`
+                : `Kept existing best (candidate not improved)${slopeNote}`;
 
             return {
                 id: nb.node,
@@ -365,6 +374,7 @@ function buildMapGraph(stepsResult, currentStepIndex, destinations, routeResult,
                 relaxed: !!nb.relaxed,
                 edgeTime,
                 edgeDist,
+                edgeFuel,
                 note,
             };
         });
@@ -565,6 +575,20 @@ function MapFlowView({ nodes, edges, onClose, internalHeader = true, dashboardMo
                 </div>
             )}
             <div style={{ flex: 1, position: 'relative' }}>
+                {/* Elevation hint layer (top-down) to make fuel-aware A* decisions visually intuitive. */}
+                <div
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        pointerEvents: 'none',
+                        background: [
+                            'radial-gradient(900px 540px at 62% 48%, rgba(251,191,36,0.12), rgba(0,0,0,0) 60%)',
+                            'radial-gradient(820px 520px at 20% 78%, rgba(56,189,248,0.08), rgba(0,0,0,0) 65%)',
+                        ].join(','),
+                        opacity: 0.9,
+                        zIndex: 0,
+                    }}
+                />
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}

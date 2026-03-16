@@ -149,6 +149,30 @@ NODES: Dict[str, dict] = {
     "g6":{"label":"20 Grove Ct", "pos_3d":[ 22,0,15],"type":"address"},
 }
 
+def _elevation(x: float, z: float) -> float:
+    """
+    Synthetic elevation model (a gentle hill + a small dip) used to demonstrate
+    fuel-aware routing (uphill costs more).
+
+    Note: We keep pos_3d y=0 for the 3D scene; elevation is a separate value.
+    """
+    # Hill centered near the town's "middle road" area.
+    hx, hz = 6.0, -3.0
+    dx, dz = (x - hx), (z - hz)
+    hill = 4.0 * math.exp(-(dx * dx + dz * dz) / 520.0)
+
+    # A shallow dip near the south-west to add variation.
+    vx, vz = -22.0, 17.0
+    dx2, dz2 = (x - vx), (z - vz)
+    valley = 1.8 * math.exp(-(dx2 * dx2 + dz2 * dz2) / 700.0)
+
+    return hill - valley
+
+# Attach elevation to every node.
+for _nid, _d in NODES.items():
+    x, _, z = _d["pos_3d"]
+    _d["elev"] = round(_elevation(x, z), 3)
+
 def _dist(n1: str, n2: str) -> float:
     p1, p2 = NODES[n1]["pos_3d"], NODES[n2]["pos_3d"]
     # Return Euclidean distance correctly
@@ -267,7 +291,7 @@ ADJ = _build_adjacency()
 def get_graph_data() -> dict:
     return {
         "nodes": [
-            {"id": nid, "label": d["label"], "pos_3d": d["pos_3d"], "type": d["type"]}
+            {"id": nid, "label": d["label"], "pos_3d": d["pos_3d"], "type": d["type"], "elev": d.get("elev", 0.0)}
             for nid, d in NODES.items()
         ],
         "edges": [
