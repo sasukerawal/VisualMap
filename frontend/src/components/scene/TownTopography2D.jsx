@@ -2,8 +2,8 @@
  * TownTopography2D — the "Algorithm Topography Model" view rendered using the SAME 3D town world,
  * but with an orthographic top-down camera (2D-like) and free pan/zoom like the main map.
  */
-import { forwardRef, memo, useImperativeHandle, useMemo, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import useStore from '../../store/useStore';
@@ -28,6 +28,44 @@ function forceHomeView(controls) {
     cam.updateProjectionMatrix?.();
     controls.update?.();
     controls.saveState?.();
+}
+
+function CanvasResizeFix({ depsKey }) {
+    const { gl, camera, size, invalidate } = useThree();
+
+    useEffect(() => {
+        // In modals/flex layouts, the canvas can end up with a stale internal buffer size
+        // even though CSS size looks correct. Force-sync with the parent box.
+        const parent = gl.domElement?.parentElement;
+        if (!parent) return;
+
+        const apply = () => {
+            const rect = parent.getBoundingClientRect();
+            const w = Math.max(1, Math.floor(rect.width));
+            const h = Math.max(1, Math.floor(rect.height));
+
+            // Only touch if mismatch to avoid thrash.
+            const cur = gl.getSize(new THREE.Vector2());
+            if (Math.floor(cur.x) !== w || Math.floor(cur.y) !== h) {
+                gl.setSize(w, h, false);
+            }
+
+            camera.updateProjectionMatrix?.();
+            invalidate();
+        };
+
+        // Two RAFs handles the "layout just changed" case reliably.
+        const id1 = requestAnimationFrame(() => {
+            apply();
+            const id2 = requestAnimationFrame(apply);
+            // eslint-disable-next-line consistent-return
+            return () => cancelAnimationFrame(id2);
+        });
+        return () => cancelAnimationFrame(id1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [depsKey, size.width, size.height]);
+
+    return null;
 }
 
 const DecisionCallout3D = memo(function DecisionCallout3D() {
@@ -162,6 +200,7 @@ function ActiveEdgeProbe3D() {
 
 export const TownTopography2D = forwardRef(function TownTopography2D({ selectedOnly = true }, ref) {
     const controlsRef = useRef(null);
+    const stepsLen = useStore((s) => s.stepsResult?.steps?.length || 0);
 
     useImperativeHandle(ref, () => ({
         recenter: () => forceHomeView(controlsRef.current),
@@ -175,10 +214,13 @@ export const TownTopography2D = forwardRef(function TownTopography2D({ selectedO
                 dpr={[1, 1.25]}
                 camera={{ zoom: HOME_ZOOM, position: [HOME_POS.x, HOME_POS.y, HOME_POS.z], near: 0.1, far: 500 }}
                 gl={{ antialias: true, failIfMajorPerformanceCaveat: false, powerPreference: 'high-performance' }}
+                resize={{ debounce: { resize: 0, scroll: 0 } }}
+                style={{ width: '100%', height: '100%' }}
                 onCreated={({ gl }) => {
                     gl.setClearColor('#0b0e14', 1);
                 }}
             >
+                <CanvasResizeFix depsKey={stepsLen} />
                 <TownWorld
                     forcedCameraAngle="top"
                     selectedOnlyAddresses={selectedOnly}
@@ -195,4 +237,3 @@ export const TownTopography2D = forwardRef(function TownTopography2D({ selectedO
         </div>
     );
 });
-
