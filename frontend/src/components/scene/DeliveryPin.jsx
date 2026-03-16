@@ -10,7 +10,7 @@ import { shallow } from 'zustand/shallow';
 
 const PIN_BASE_Y = 3.2;
 
-export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, isSelected, isOnPath, showLabel, uiOverlayOpen = false }) {
+export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, isSelected, isOnPath, showLabel, uiOverlayOpen = false, interactive = true }) {
     const meshRef = useRef();
     const [hovered, setHovered] = useState(false);
     const { addDestination, removeDestination, isPlaying, deliveredNodes } = useStore(
@@ -32,6 +32,7 @@ export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, 
     });
 
     const handleClick = (e) => {
+        if (interactive === false) return;
         e.stopPropagation();
         if (isPlaying) return;
         if (isSelected) removeDestination(nodeId);
@@ -57,7 +58,7 @@ export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, 
     const canShowLabel = !uiOverlayOpen && (showLabel || hovered || isSelected);
 
     return (
-        <group position={[position[0], 0, position[2]]}>
+        <group position={[position[0], position[1] ?? 0, position[2]]}>
             <mesh position={[0, PIN_BASE_Y + 0.15, 0]}>
                 <cylinderGeometry args={[0.05, 0.05, 0.5, 6]} />
                 <meshStandardMaterial color="#8ea2bf" metalness={0.6} roughness={0.3} />
@@ -66,13 +67,13 @@ export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, 
             <mesh
                 ref={meshRef}
                 position={[0, PIN_BASE_Y + 0.4, 0]}
-                onClick={handleClick}
-                onPointerOver={(e) => {
+                onClick={interactive === false ? undefined : handleClick}
+                onPointerOver={interactive === false ? undefined : (e) => {
                     e.stopPropagation();
                     setHovered(true);
                     document.body.style.cursor = 'pointer';
                 }}
-                onPointerOut={() => {
+                onPointerOut={interactive === false ? undefined : () => {
                     setHovered(false);
                     document.body.style.cursor = 'default';
                 }}

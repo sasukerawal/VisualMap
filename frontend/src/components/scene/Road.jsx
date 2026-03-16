@@ -6,19 +6,29 @@
 import { memo, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
+import { groundHeightAt } from '../../data/elevation';
 
 export const Road = memo(function Road({ from, to, oneWay = false, isExplored, isFinal, isActiveRelaxed, isDriveway = false, roadType, speedLimit, uiOverlayOpen = false }) {
     const [hovered, setHovered] = useState(false);
     if (!from || !to) return null;
 
-    const { position, rotY, length } = useMemo(() => {
-        const s = new THREE.Vector3(...from);
-        const e = new THREE.Vector3(...to);
+    const roadOffset = isDriveway ? 0.09 : 0.045;
+
+    const { position, quat, length, planarLength } = useMemo(() => {
+        const s = new THREE.Vector3(from[0], groundHeightAt(from[0], from[2]) + roadOffset, from[2]);
+        const e = new THREE.Vector3(to[0], groundHeightAt(to[0], to[2]) + roadOffset, to[2]);
         const dir = e.clone().sub(s);
         const len = dir.length();
         const mid = s.clone().add(e).multiplyScalar(0.5);
-        return { position: [mid.x, 0, mid.z], rotY: Math.atan2(dir.x, dir.z), length: len };
-    }, [from, to]);
+
+        const q = new THREE.Quaternion();
+        if (len > 0.0001) {
+            q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
+        }
+
+        const pLen = Math.hypot(to[0] - from[0], to[2] - from[2]);
+        return { position: [mid.x, mid.y, mid.z], quat: q, length: len, planarLength: pLen };
+    }, [from, to, roadOffset]);
 
     let roadColor = '#1a1f26'; // deeper asphalt
     if (roadType === 'main') roadColor = '#12181d';
@@ -36,16 +46,15 @@ export const Road = memo(function Road({ from, to, oneWay = false, isExplored, i
         roadColor = '#1e1b4b'; emissive = '#6366f1'; emissiveInt = 0.45; glowColor = '#818cf8';
     }
 
-    const baseY = isDriveway ? 0.08 : 0;
     const roadWidth = isDriveway ? 1.2 : 2.2; // Slightly wider main roads
 
     // Calculate transit time for display
-    const transitTime = (length / (speedLimit || 1)).toFixed(1);
+    const transitTime = (planarLength / (speedLimit || 1)).toFixed(1);
 
     return (
         <group
-            position={[position[0], baseY, position[2]]}
-            rotation={[0, rotY, 0]}
+            position={position}
+            quaternion={quat}
             onPointerOver={() => setHovered(true)}
             onPointerOut={() => setHovered(false)}
         >

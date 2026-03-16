@@ -18,3 +18,11 @@ export function elevationAt(x, z) {
     return hill - valley;
 }
 
+// Terrain constants used by the 3D scene. Keeping these here avoids "amp/base"
+// drifting between the ground mesh and the objects that should sit on it.
+export const TERRAIN_AMP = 0.22;
+export const TERRAIN_BASE_Y = -0.07;
+
+export function groundHeightAt(x, z) {
+    return TERRAIN_BASE_Y + elevationAt(x, z) * TERRAIN_AMP;
+}

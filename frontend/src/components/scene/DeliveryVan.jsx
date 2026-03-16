@@ -8,6 +8,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import useStore from '../../store/useStore';
 import { NODES } from '../../data/townGraph';
+import { groundHeightAt } from '../../data/elevation';
 import { shallow } from 'zustand/shallow';
 
 // Units per second at 1x speed
@@ -50,7 +51,9 @@ export function DeliveryVan() {
     const waypoints = useMemo(() => (
         path.map((id) => {
             const n = NODES[id];
-            return n ? new THREE.Vector3(n.pos[0], 0.35, n.pos[2]) : new THREE.Vector3(0, 0.35, 0);
+            if (!n) return new THREE.Vector3(0, 0.35, 0);
+            const y = groundHeightAt(n.pos[0], n.pos[2]) + 0.35;
+            return new THREE.Vector3(n.pos[0], y, n.pos[2]);
         })
     ), [path.join('|')]);
 
@@ -127,7 +130,11 @@ export function DeliveryVan() {
         }
     });
 
-    const startPos = waypoints[0] ?? new THREE.Vector3(NODES.warehouse.pos[0], 0.35, NODES.warehouse.pos[2]);
+    const startPos = waypoints[0] ?? new THREE.Vector3(
+        NODES.warehouse.pos[0],
+        groundHeightAt(NODES.warehouse.pos[0], NODES.warehouse.pos[2]) + 0.35,
+        NODES.warehouse.pos[2]
+    );
 
     return (
         <group ref={vanRef} position={[startPos.x, startPos.y, startPos.z]}>

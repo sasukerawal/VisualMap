@@ -21,7 +21,7 @@ const HOUSE_COLORS = [
     '#a5b4fc', // Indigo
 ];
 
-export const House = memo(function House({ nodeId, position, colorIndex, scale: propScale = [1, 1, 1] }) {
+export const House = memo(function House({ nodeId, position, colorIndex, scale: propScale = [1, 1, 1], interactive = true }) {
     const { addDestination, destinations, removeDestination } = useStore(
         (s) => ({
             addDestination: s.addDestination,
@@ -68,6 +68,7 @@ export const House = memo(function House({ nodeId, position, colorIndex, scale: 
     });
 
     const handleClick = (e) => {
+        if (!interactive) return;
         e.stopPropagation();
         if (isSelected) {
             removeDestination(nodeId);
@@ -80,17 +81,17 @@ export const House = memo(function House({ nodeId, position, colorIndex, scale: 
         <group
             ref={groupRef}
             position={position}
-            onClick={handleClick}
-            onPointerOver={(e) => {
+            onClick={interactive ? handleClick : undefined}
+            onPointerOver={interactive ? (e) => {
                 e.stopPropagation();
                 setHovered(true);
                 document.body.style.cursor = 'pointer';
-            }}
-            onPointerOut={(e) => {
+            } : undefined}
+            onPointerOut={interactive ? (e) => {
                 e.stopPropagation();
                 setHovered(false);
                 document.body.style.cursor = 'auto';
-            }}
+            } : undefined}
         >
             {/* Selection / hover ring */}
             <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]}>

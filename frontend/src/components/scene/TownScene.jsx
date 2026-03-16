@@ -15,7 +15,7 @@ import { NodeMarker } from './NodeMarker';
 import { DeliveryPin } from './DeliveryPin';
 import { Tree } from './Tree';
 import { NODES, EDGES, ADDRESS_NODES, displayNodeName } from '../../data/townGraph';
-import { elevationAt } from '../../data/elevation';
+import { elevationAt, groundHeightAt, TERRAIN_AMP, TERRAIN_BASE_Y } from '../../data/elevation';
 import useStore from '../../store/useStore';
 import { shallow } from 'zustand/shallow';
 
@@ -34,6 +34,8 @@ const BLOCKS = [
 // A green lawn with a white concrete sidewalk border
 // And sprinkled trees inside
 function BlockLot({ cx, cz, w, d, seed }) {
+    const baseY = groundHeightAt(cx, cz);
+
     // Generate some random tree positions within this lot
     const trees = useMemo(() => {
         const arr = [];
@@ -53,15 +55,15 @@ function BlockLot({ cx, cz, w, d, seed }) {
     }, [w, d, seed]);
 
     return (
-        <group position={[cx, 0, cz]}>
+        <group position={[cx, baseY, cz]}>
             {/* Sidewalk base */}
-            <mesh receiveShadow position={[0, 0.02, 0]}>
-                <boxGeometry args={[w + 1.2, 0.04, d + 1.2]} />
+            <mesh receiveShadow position={[0, -0.03, 0]}>
+                <boxGeometry args={[w + 1.2, 0.18, d + 1.2]} />
                 <meshStandardMaterial color="#cbd5e1" roughness={0.9} />
             </mesh>
             {/* Green Lawn */}
-            <mesh receiveShadow position={[0, 0.05, 0]}>
-                <boxGeometry args={[w, 0.06, d]} />
+            <mesh receiveShadow position={[0, 0.02, 0]}>
+                <boxGeometry args={[w, 0.14, d]} />
                 <meshStandardMaterial color="#4d7c0f" roughness={1.0} />
             </mesh>
             {/* Trees */}
@@ -138,18 +140,15 @@ function SceneContent() {
         const pos = geo.attributes.position;
         const colors = new Float32Array(pos.count * 3);
 
-        // Stronger amplitude so the hill is obvious in screenshots.
-        // Roads/houses still sit on the "town plane" (y=0), so keep this moderate.
-        const amp = 0.22;
         for (let i = 0; i < pos.count; i++) {
             const x = pos.getX(i);
             const z = pos.getZ(i);
             const e = elevationAt(x, z);
-            const y = e * amp;
+            const y = e * TERRAIN_AMP;
             pos.setY(i, y);
 
             // Colorize: low -> cooler, high -> warmer
-            const t = Math.max(0, Math.min(1, (y / (amp * 3.0) + 0.5)));
+            const t = Math.max(0, Math.min(1, (y / (TERRAIN_AMP * 3.0) + 0.5)));
             const c = new THREE.Color().setHSL(0.30 - t * 0.12, 0.45, 0.18 + t * 0.18);
             colors[i * 3 + 0] = c.r;
             colors[i * 3 + 1] = c.g;
@@ -174,6 +173,11 @@ function SceneContent() {
 
     const finalPath = routeResult?.path || [];
     const addressNodeIds = useMemo(() => new Set(ADDRESS_NODES.map(n => n.id)), []);
+
+    const warehousePos = useMemo(() => {
+        const p = NODES.warehouse.pos;
+        return [p[0], groundHeightAt(p[0], p[2]), p[2]];
+    }, []);
 
     // Edges belonging to the final shortest path
     const finalEdgeSet = useMemo(() => {
@@ -241,7 +245,7 @@ function SceneContent() {
             />
 
             {/* Ground (with subtle terrain elevation to visualize uphill/downhill) */}
-            <mesh receiveShadow position={[0, -0.07, 0]} geometry={terrainGeo}>
+            <mesh receiveShadow position={[0, TERRAIN_BASE_Y, 0]} geometry={terrainGeo}>
                 <meshStandardMaterial vertexColors roughness={0.98} metalness={0.0} />
             </mesh>
 
@@ -279,13 +283,13 @@ function SceneContent() {
                 <House
                     key={node.id}
                     nodeId={node.id}
-                    position={[node.pos[0], 0, node.pos[2]]}
+                    position={[node.pos[0], groundHeightAt(node.pos[0], node.pos[2]) + 0.02, node.pos[2]]}
                     colorIndex={i}
                 />
             ))}
 
             {/* Warehouse */}
-            <Warehouse position={NODES.warehouse.pos} />
+            <Warehouse position={warehousePos} />
 
             {/* Intersection markers (small dots) */}
             {Object.entries(NODES)
@@ -294,7 +298,7 @@ function SceneContent() {
                     <NodeMarker
                         key={id}
                         nodeId={id}
-                        position={node.pos}
+                        position={[node.pos[0], groundHeightAt(node.pos[0], node.pos[2]) + 0.09, node.pos[2]]}
                         label={showLabels && !uiOverlayOpen ? displayNodeName(id) : null}
                         isExplored={exploredNodes.includes(id)}
                         isOnPath={finalPath.includes(id)}
@@ -306,7 +310,7 @@ function SceneContent() {
                 <DeliveryPin
                     key={node.id}
                     nodeId={node.id}
-                    position={node.pos}
+                    position={[node.pos[0], groundHeightAt(node.pos[0], node.pos[2]) + 0.02, node.pos[2]]}
                     label={node.label}
                     isSelected={destinations.includes(node.id)}
                     isOnPath={finalPath.includes(node.id)}
