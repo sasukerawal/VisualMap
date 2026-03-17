@@ -1,4 +1,5 @@
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 import ReasoningPanel from './ReasoningPanel';
 import PseudocodeViewer from './PseudocodeViewer';
 import { StateVariablesPanel } from './StateVariablesPanel';
@@ -120,7 +121,23 @@ export function TheoryOverlay() {
         isTimelinePlaying,
         isTimelinePaused,
         animationSpeed,
-    } = useStore();
+    } = useStore(
+        (s) => ({
+            algorithm: s.algorithm,
+            stepsResult: s.stepsResult,
+            currentStepIndex: s.currentStepIndex,
+            setCurrentStepIndex: s.setCurrentStepIndex,
+            destinations: s.destinations,
+            orderMode: s.orderMode,
+            routeResult: s.routeResult,
+            currentSegment: s.currentSegment,
+            setStepsResult: s.setStepsResult,
+            isTimelinePlaying: s.isTimelinePlaying,
+            isTimelinePaused: s.isTimelinePaused,
+            animationSpeed: s.animationSpeed,
+        }),
+        shallow
+    );
 
     if (!routeResult || !destinations?.length) {
         return <EmptyTheoryState />;
@@ -170,9 +187,9 @@ export function TheoryOverlay() {
             >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
                     <div>
-                        <div style={{ fontSize: 10, fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Search Progress</div>
+                        <div style={{ fontSize: 10, fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Algorithm Progress</div>
                         <div style={{ marginTop: 4, fontSize: 12, fontWeight: 900, color: '#eef2ff' }}>
-                            Consideration {currentStepIndex + 1} / {stepsResult.steps.length}
+                            Step {currentStepIndex + 1} / {stepsResult.steps.length}
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -315,9 +332,9 @@ export function TheoryOverlay() {
             >
                 {[
                     { label: 'Algorithm', value: algorithmLabel },
-                    { label: 'Focused Node', value: currentStep?.node || 'n/a' },
-                    { label: 'Distance', value: currentStep?.distance?.toFixed ? `${currentStep.distance.toFixed(2)}s` : 'n/a' },
-                    { label: 'Action', value: currentStep?.action || 'n/a' },
+                    { label: 'Current Step', value: currentStep?.narration?.action_title || currentStep?.action || 'n/a' },
+                    { label: 'Focus', value: currentStep?.node ? displayNodeName(currentStep.node) : 'n/a' },
+                    { label: 'Progress', value: stepsResult?.steps?.length ? `${currentStepIndex + 1} / ${stepsResult.steps.length}` : 'n/a' },
                 ].map((item) => (
                     <div
                         key={item.label}

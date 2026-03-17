@@ -83,6 +83,11 @@ def astar(
     # Line 3: Loop while open_heap
     while open_heap:
         # Line 4: Pop min f
+        # Teaching snapshot: what is being compared inside the open set.
+        open_candidates = sorted(
+            [(f_fuel[n], n) for n in graph if n not in closed and f_fuel.get(n, float("inf")) != float("inf")],
+            key=lambda x: x[0],
+        )[:8]
         _, u = heapq.heappop(open_heap)
 
         if u in closed:
@@ -92,13 +97,19 @@ def astar(
         step_counter += 1
 
         h_u = _heuristic(u, end)
-        neighbors_updated = []
+        neighbors_updated = []  # backwards compatible: only updates
+        comparisons = []        # v2 narration: updates + no-updates
 
         # Line 6: Neighbors loop
         for v, time_cost, phys_dist in graph.get(u, []):
             if v in closed:
                 continue
             # Line 7: Relaxation check
+            old_g_fuel = g_fuel[v]
+            old_g_time = g_time[v]
+            old_g_raw = g_raw[v]
+            old_prev_v = prev[v]
+
             edge_fuel, elev_delta, fuel_mult = _edge_fuel_cost(u, v, phys_dist)
             tentative_fuel = g_fuel[u] + edge_fuel
             tentative_time = g_time[u] + time_cost
@@ -129,8 +140,100 @@ def astar(
                     "f": round(f_fuel[v], 2),
                     "relaxed": True
                 })
+                comparisons.append({
+                    "kind": "edge_relaxation",
+                    "edge": {
+                        "from": u,
+                        "to": v,
+                        "time_cost": round(time_cost, 2),
+                        "physical_distance": round(phys_dist, 2),
+                        "fuel_cost": round(edge_fuel, 2),
+                        "elev_delta": round(elev_delta, 3),
+                        "fuel_multiplier": round(fuel_mult, 3),
+                    },
+                    "updated": True,
+                    "old_fuel": "inf" if old_g_fuel == float("inf") else round(old_g_fuel, 2),
+                    "candidate_fuel": round(tentative_fuel, 2),
+                    "new_fuel": round(g_fuel[v], 2),
+                    "old_value": "inf" if old_g_time == float("inf") else round(old_g_time, 2),
+                    "candidate_value": round(tentative_time, 2),
+                    "new_value": round(g_time[v], 2),
+                    "old_raw": "inf" if old_g_raw == float("inf") else round(old_g_raw, 2),
+                    "candidate_raw": round(tentative_raw, 2),
+                    "new_raw": round(g_raw[v], 2),
+                    "old_parent": old_prev_v,
+                    "new_parent": u,
+                    "old_g": "inf" if old_g_fuel == float("inf") else round(old_g_fuel, 2),
+                    "candidate_g": round(tentative_fuel, 2),
+                    "new_g": round(g_fuel[v], 2),
+                    "h": round(h_v, 2),
+                    "old_f": "inf" if old_g_fuel == float("inf") else round(old_g_fuel + h_v, 2),
+                    "candidate_f": round(tentative_fuel + h_v, 2),
+                    "new_f": round(f_fuel[v], 2),
+                    "note": "Lower g(n) found, so we update predecessor and scores, then push into the open set.",
+                })
+            else:
+                h_v = _heuristic(v, end)
+                comparisons.append({
+                    "kind": "edge_relaxation",
+                    "edge": {
+                        "from": u,
+                        "to": v,
+                        "time_cost": round(time_cost, 2),
+                        "physical_distance": round(phys_dist, 2),
+                        "fuel_cost": round(edge_fuel, 2),
+                        "elev_delta": round(elev_delta, 3),
+                        "fuel_multiplier": round(fuel_mult, 3),
+                    },
+                    "updated": False,
+                    "old_fuel": "inf" if old_g_fuel == float("inf") else round(old_g_fuel, 2),
+                    "candidate_fuel": round(tentative_fuel, 2),
+                    "new_fuel": "inf" if old_g_fuel == float("inf") else round(old_g_fuel, 2),
+                    "old_value": "inf" if old_g_time == float("inf") else round(old_g_time, 2),
+                    "candidate_value": round(tentative_time, 2),
+                    "new_value": "inf" if old_g_time == float("inf") else round(old_g_time, 2),
+                    "old_raw": "inf" if old_g_raw == float("inf") else round(old_g_raw, 2),
+                    "candidate_raw": round(tentative_raw, 2),
+                    "new_raw": "inf" if old_g_raw == float("inf") else round(old_g_raw, 2),
+                    "old_parent": old_prev_v,
+                    "new_parent": old_prev_v,
+                    "old_g": "inf" if old_g_fuel == float("inf") else round(old_g_fuel, 2),
+                    "candidate_g": round(tentative_fuel, 2),
+                    "new_g": "inf" if old_g_fuel == float("inf") else round(old_g_fuel, 2),
+                    "h": round(h_v, 2),
+                    "old_f": "inf" if old_g_fuel == float("inf") else round(old_g_fuel + h_v, 2),
+                    "candidate_f": round(tentative_fuel + h_v, 2),
+                    "new_f": "inf" if old_g_fuel == float("inf") else round(old_g_fuel + h_v, 2),
+                    "note": "No update: the candidate route does not reduce g(n), so we keep current predecessor and scores.",
+                })
 
         # Record step metadata
+        # Some internal nodes (e.g. driveways) may have an empty label; fall back to node id.
+        node_label = (NODES.get(u, {}) or {}).get("label") or u
+        why = (
+            f"We choose node {node_label} because it has the smallest estimated total cost f(n) in the open set. "
+            f"For A*, f(n) = g(n) + h(n): g(n) is the cost from start to {node_label}, and h(n) is the heuristic estimate to the goal."
+        )
+        updates_count = sum(1 for c in comparisons if c.get("updated"))
+        open_after = sorted(
+            [(f_fuel[n], n) for n in graph if n not in closed and f_fuel.get(n, float("inf")) != float("inf")],
+            key=lambda x: x[0],
+        )[:8]
+        preview_nodes = list(
+            dict.fromkeys([u] + [c.get("edge", {}).get("to") for c in comparisons if c.get("edge")] + [n for _, n in open_after])
+        )[:12]
+        dist_preview = {}
+        parent_preview = {}
+        for n in preview_nodes:
+            gv = g_fuel.get(n, float("inf"))
+            dist_preview[n] = "inf" if gv == float("inf") else round(gv, 2)
+            parent_preview[n] = prev.get(n)
+        summary = (
+            f"End of step: moved {node_label} into the closed set. "
+            f"Checked {len(comparisons)} neighbor(s): {updates_count} update(s) and {len(comparisons) - updates_count} no-change comparison(s). "
+            f"Next, A* will select the open-set node with the smallest f(n)."
+        )
+
         exploration_order.append({
             "step": step_counter,
             "node": u,
@@ -142,7 +245,7 @@ def astar(
             "f_fuel": round(f_fuel[u], 2),
             "action": "settle",
             "active_line": 4, # Pop node
-            "explanation": f"Selecting '{NODES[u].get('label', u)}' because it has the lowest estimated fuel cost (f_fuel={f_fuel[u]:.2f}).",
+            "explanation": why,
             "math_breakdown": {
                 "time_g": round(g_time[u], 2),
                 "fuel_g": round(g_fuel[u], 2),
@@ -150,18 +253,38 @@ def astar(
                 "f_fuel": round(f_fuel[u], 2)
             },
             "description": (
-                f"Step {step_counter}: Expand '{u}' — "
-                f"time={g_time[u]:.2f}s, fuel={g_fuel[u]:.2f}, h={h_u:.2f}, f_fuel={f_fuel[u]:.2f}. "
-                f"Relaxed {len(neighbors_updated)} neighbor(s)."
+                f"Step {step_counter}: Select {node_label} (min f(n)) and relax outgoing edges (A*)."
             ),
             "neighbors_updated": neighbors_updated,
+            "narration": {
+                "action_title": f"Step {step_counter}: Select node {node_label} with minimum f(n) in the open set",
+                "action_subtitle": "A* compares f(n) = g(n) + h(n), then relaxes neighbors to improve best-known g(n).",
+                "why": why,
+                "comparisons": comparisons,
+                "summary": summary,
+                "state_after": {
+                    "open_set": [{"node": n, "key": round(k, 2)} for k, n in open_after],
+                    "closed_set": list(visited)[-24:],
+                    "updates_in_step": updates_count,
+                    "changed_nodes": [c.get("edge", {}).get("to") for c in comparisons if c.get("updated")][:12],
+                    "dist_preview": dist_preview,
+                    "parent_preview": parent_preview,
+                },
+            },
         })
 
         # Line 5: Check goal
         if u == end:
             # Update the last entry to indicate goal reached
             exploration_order[-1]["active_line"] = 5
-            exploration_order[-1]["explanation"] = f"Goal reached! '{NODES[u].get('label', u)}' is the target destination."
+            exploration_order[-1]["explanation"] = (
+                f"Goal check: the selected node {node_label} is the destination. "
+                f"A* stops and reconstructs the path from predecessor links."
+            )
+            if exploration_order[-1].get("narration"):
+                exploration_order[-1]["narration"]["action_title"] = f"Step {step_counter}: Goal reached at {node_label}"
+                exploration_order[-1]["narration"]["action_subtitle"] = "The destination has been selected; reconstruct the path by following predecessors."
+                exploration_order[-1]["narration"]["summary"] = "End of step: destination reached. Reconstruct the path and stop."
             break
 
     # Reconstruct
@@ -218,6 +341,7 @@ def _build_steps(exploration_order: list) -> list:
             "active_line": e.get("active_line"),
             "explanation": e.get("explanation"),
             "math_breakdown": e.get("math_breakdown"),
+            "narration": e.get("narration"),
         }
         for e in exploration_order
     ]

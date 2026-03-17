@@ -5,7 +5,7 @@
  */
 import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Sky } from '@react-three/drei';
+import { AdaptiveDpr, OrbitControls, Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import { Road } from './Road';
 import { House } from './House';
@@ -54,21 +54,56 @@ function BlockLot({ cx, cz, w, d, seed }) {
         return arr;
     }, [w, d, seed]);
 
+    // Conform the lot surfaces to the same elevation field as the ground mesh.
+    // This prevents flat lots from intersecting houses once we introduce hills/valleys.
+    const sidewalkGeo = useMemo(() => {
+        const geo = new THREE.PlaneGeometry(w + 1.2, d + 1.2, 18, 18);
+        geo.rotateX(-Math.PI / 2);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const z = pos.getZ(i);
+            const y = groundHeightAt(cx + x, cz + z) - baseY + 0.006;
+            pos.setY(i, y);
+        }
+        pos.needsUpdate = true;
+        geo.computeVertexNormals();
+        return geo;
+    }, [cx, cz, w, d, baseY]);
+
+    const lawnGeo = useMemo(() => {
+        const geo = new THREE.PlaneGeometry(w, d, 18, 18);
+        geo.rotateX(-Math.PI / 2);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const z = pos.getZ(i);
+            const y = groundHeightAt(cx + x, cz + z) - baseY + 0.014;
+            pos.setY(i, y);
+        }
+        pos.needsUpdate = true;
+        geo.computeVertexNormals();
+        return geo;
+    }, [cx, cz, w, d, baseY]);
+
     return (
         <group position={[cx, baseY, cz]}>
-            {/* Sidewalk base */}
-            <mesh receiveShadow position={[0, -0.03, 0]}>
-                <boxGeometry args={[w + 1.2, 0.18, d + 1.2]} />
+            {/* Sidewalk base (conforming surface) */}
+            <mesh receiveShadow geometry={sidewalkGeo}>
                 <meshStandardMaterial color="#cbd5e1" roughness={0.9} />
             </mesh>
-            {/* Green Lawn */}
-            <mesh receiveShadow position={[0, 0.02, 0]}>
-                <boxGeometry args={[w, 0.14, d]} />
+            {/* Green Lawn (conforming surface) */}
+            <mesh receiveShadow geometry={lawnGeo}>
                 <meshStandardMaterial color="#4d7c0f" roughness={1.0} />
             </mesh>
             {/* Trees */}
             {trees.map((t, i) => (
-                <Tree key={i} position={[t.x, 0.07, t.z]} scale={t.scale} type={t.type} />
+                <Tree
+                    key={i}
+                    position={[t.x, groundHeightAt(cx + t.x, cz + t.z) - baseY + 0.02, t.z]}
+                    scale={t.scale}
+                    type={t.type}
+                />
             ))}
         </group>
     );
@@ -107,17 +142,24 @@ function CameraRig({ cameraAngle, controlsRef: externalControlsRef }) {
             enablePan
             enableRotate={cameraAngle === 'perspective'}
             enableZoom
+            zoomToCursor
+            screenSpacePanning
             panSpeed={0.4}
             rotateSpeed={0.4}
             zoomSpeed={0.8}
             dampingFactor={0.05}
             enableDamping
             maxPolarAngle={Math.PI / 2.2}
-            minDistance={15}
-            maxDistance={120}
+            minDistance={10}
+            maxDistance={170}
             minZoom={6}
             maxZoom={26}
             target={[0, 0, -2]}
+            mouseButtons={cameraAngle === 'top' ? {
+                LEFT: THREE.MOUSE.PAN,
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.PAN,
+            } : undefined}
         />
     );
 }
@@ -361,6 +403,8 @@ export function TownScene() {
                 dpr={[1, 1.5]}
                 gl={{ antialias: true, failIfMajorPerformanceCaveat: false, powerPreference: 'high-performance' }}
             >
+                {/* Dynamically lower DPR on slow frames to keep the UI responsive. */}
+                <AdaptiveDpr pixelated />
                 <TownWorld />
             </Canvas>
         </div>

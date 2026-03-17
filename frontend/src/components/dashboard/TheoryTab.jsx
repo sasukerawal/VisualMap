@@ -2,12 +2,22 @@
  * TheoryTab - Step-by-step algorithm explanation viewer
  * Dynamically adjusts complexity based on the selected Learning Mode.
  */
-import { useState, useEffect } from 'react';
+import { startTransition, useState, useEffect } from 'react';
 import { PSEUDOCODE } from '../../data/pseudocode';
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 
 export function TheoryTab() {
-    const { algorithm, stepsResult, currentStepIndex, setCurrentStepIndex, learningMode } = useStore();
+    const { algorithm, stepsResult, currentStepIndex, setCurrentStepIndex, learningMode } = useStore(
+        (s) => ({
+            algorithm: s.algorithm,
+            stepsResult: s.stepsResult,
+            currentStepIndex: s.currentStepIndex,
+            setCurrentStepIndex: s.setCurrentStepIndex,
+            learningMode: s.learningMode,
+        }),
+        shallow
+    );
     const pseudocode = PSEUDOCODE[algorithm] || [];
 
     const [localStep, setLocalStep] = useState(currentStepIndex);
@@ -24,7 +34,7 @@ export function TheoryTab() {
     function goTo(i) {
         const clamped = Math.max(0, Math.min(totalSteps - 1, i));
         setLocalStep(clamped);
-        setCurrentStepIndex(clamped);
+        startTransition(() => setCurrentStepIndex(clamped));
     }
 
     const isBeginner = learningMode === 'beginner';

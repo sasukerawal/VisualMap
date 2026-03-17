@@ -4,6 +4,13 @@
  */
 import { create } from 'zustand';
 
+function clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+}
+
+// Keep rAF ids out of Zustand state to avoid per-frame store updates.
+let timelineRafId = 0;
+
 const useStore = create((set, get) => ({
     // ── Algorithm ────────────────────────────────────────────────────────────
     algorithm: 'dijkstra',  // 'dijkstra' | 'astar' | 'bellman_ford'
@@ -84,36 +91,65 @@ const useStore = create((set, get) => ({
     timelineTimerId: null,
 
     runSimulation: () => {
-        const { stepsResult, animationSpeed, timelineTimerId } = get();
+        const { stepsResult, timelineTimerId } = get();
         if (!stepsResult?.steps?.length) return;
 
-        if (timelineTimerId) clearInterval(timelineTimerId);
+        // Cancel any existing loop without causing extra store churn.
+        if (timelineRafId) cancelAnimationFrame(timelineRafId);
+        if (timelineTimerId) cancelAnimationFrame(timelineTimerId);
         set({ isTimelinePlaying: true, isTimelinePaused: false });
 
-        const interval = setInterval(() => {
+        // rAF-driven timeline: smoother and honors speed changes immediately.
+        let lastTs = 0;
+        let accumMs = 0;
+
+        const tick = (ts) => {
             const state = get();
-            if (state.isTimelinePaused) return;
+            if (!state.isTimelinePlaying || state.isTimelinePaused) return;
 
-            const last = (state.stepsResult?.steps?.length || 0) - 1;
-            if (state.currentStepIndex < last) {
-                set({ currentStepIndex: state.currentStepIndex + 1 });
-            } else {
-                get().pauseSimulation();
+            const stepsLen = state.stepsResult?.steps?.length || 0;
+            const lastIndex = Math.max(0, stepsLen - 1);
+            const speed = clamp(state.animationSpeed || 1, 0.25, 4);
+            const stepMs = 1000 / speed;
+
+            if (!lastTs) lastTs = ts;
+            const dt = clamp(ts - lastTs, 0, 64);
+            lastTs = ts;
+            accumMs += dt;
+
+            let idx = state.currentStepIndex || 0;
+            while (accumMs >= stepMs && idx < lastIndex) {
+                accumMs -= stepMs;
+                idx += 1;
             }
-        }, 1000 / animationSpeed);
+            if (idx !== state.currentStepIndex) set({ currentStepIndex: idx });
 
-        set({ timelineTimerId: interval });
+            if (idx >= lastIndex) {
+                get().pauseSimulation();
+                return;
+            }
+
+            timelineRafId = requestAnimationFrame(tick);
+        };
+
+        timelineRafId = requestAnimationFrame(tick);
+        // Keep this for UI/debugging only (not updated per-frame).
+        set({ timelineTimerId: timelineRafId });
     },
 
     pauseSimulation: () => {
         const { timelineTimerId } = get();
-        if (timelineTimerId) clearInterval(timelineTimerId);
+        if (timelineRafId) cancelAnimationFrame(timelineRafId);
+        timelineRafId = 0;
+        if (timelineTimerId) cancelAnimationFrame(timelineTimerId);
         set({ isTimelinePlaying: false, isTimelinePaused: true, timelineTimerId: null });
     },
 
     resetSimulation: () => {
         const { timelineTimerId } = get();
-        if (timelineTimerId) clearInterval(timelineTimerId);
+        if (timelineRafId) cancelAnimationFrame(timelineRafId);
+        timelineRafId = 0;
+        if (timelineTimerId) cancelAnimationFrame(timelineTimerId);
         set({
             isTimelinePlaying: false,
             isTimelinePaused: false,
@@ -126,7 +162,9 @@ const useStore = create((set, get) => ({
     resetAll: () => {
         const { timerId, timelineTimerId } = get();
         if (timerId) clearInterval(timerId);
-        if (timelineTimerId) clearInterval(timelineTimerId);
+        if (timelineRafId) cancelAnimationFrame(timelineRafId);
+        timelineRafId = 0;
+        if (timelineTimerId) cancelAnimationFrame(timelineTimerId);
         set({
             destinations: [],
             routeResult: null,
@@ -150,7 +188,9 @@ const useStore = create((set, get) => ({
     resetAnimation: () => {
         const { timerId, timelineTimerId } = get();
         if (timerId) clearInterval(timerId);
-        if (timelineTimerId) clearInterval(timelineTimerId);
+        if (timelineRafId) cancelAnimationFrame(timelineRafId);
+        timelineRafId = 0;
+        if (timelineTimerId) cancelAnimationFrame(timelineTimerId);
         set({
             isPlaying: false,
             isPaused: false,

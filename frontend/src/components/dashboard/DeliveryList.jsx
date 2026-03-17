@@ -2,10 +2,20 @@
  * DeliveryList — shows and manages the list of delivery destinations.
  */
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 import { NODES } from '../../data/townGraph';
 
 export function DeliveryList() {
-    const { destinations, removeDestination, clearDestinations, deliveredNodes, isPlaying } = useStore();
+    const { destinations, removeDestination, clearDestinations, deliveredNodes, isPlaying } = useStore(
+        (s) => ({
+            destinations: s.destinations,
+            removeDestination: s.removeDestination,
+            clearDestinations: s.clearDestinations,
+            deliveredNodes: s.deliveredNodes,
+            isPlaying: s.isPlaying,
+        }),
+        shallow
+    );
 
     return (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

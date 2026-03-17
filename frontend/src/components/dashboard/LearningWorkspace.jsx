@@ -13,6 +13,7 @@ import { TheoryTab } from './TheoryTab';
 import { TheoryOverlay } from './TheoryOverlay';
 import { TablesTab } from './TablesTab';
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 import { NODES } from '../../data/townGraph';
 import { displayNodeName } from '../../data/townGraph';
 
@@ -38,7 +39,26 @@ export function LearningWorkspace() {
         setCurrentStepIndex,
         isTimelinePlaying,
         isTimelinePaused,
-    } = useStore();
+    } = useStore(
+        (s) => ({
+            showLabels: s.showLabels,
+            setShowLabels: s.setShowLabels,
+            cameraAngle: s.cameraAngle,
+            setCameraAngle: s.setCameraAngle,
+            destinations: s.destinations,
+            routeResult: s.routeResult,
+            stepsResult: s.stepsResult,
+            learningMode: s.learningMode,
+            setLearningMode: s.setLearningMode,
+            currentSegment: s.currentSegment,
+            deliveredNodes: s.deliveredNodes,
+            currentStepIndex: s.currentStepIndex,
+            setCurrentStepIndex: s.setCurrentStepIndex,
+            isTimelinePlaying: s.isTimelinePlaying,
+            isTimelinePaused: s.isTimelinePaused,
+        }),
+        shallow
+    );
 
     useEffect(() => {
         // Ensure overlay flag is cleared if this component remounts.
@@ -280,10 +300,10 @@ export function LearningWorkspace() {
                                                         <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 14, border: '1px solid rgba(148,163,184,0.14)', background: 'rgba(255,255,255,0.02)' }}>
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
                                                                 <div style={{ fontSize: 10, fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                                                                    Search Progress
+                                                                    Algorithm Progress
                                                                 </div>
                                                                 <div style={{ fontSize: 12, fontWeight: 900, color: '#eef2ff' }}>
-                                                                    Consideration {currentStepIndex + 1} / {stepsResult.steps.length}
+                                                                    Step {currentStepIndex + 1} / {stepsResult.steps.length}
                                                                 </div>
                                                             </div>
                                                             <input

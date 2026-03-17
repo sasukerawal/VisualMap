@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ReasoningPanel({ steps, currentIndex, title = "Algorithmic Logic", variant = "default" }) {
@@ -12,31 +12,27 @@ export default function ReasoningPanel({ steps, currentIndex, title = "Algorithm
         }
     }, [currentIndex]);
 
-    const currentLogs = steps.slice(0, currentIndex + 1).map((step, idx) => {
-        const isLast = idx === currentIndex;
-        let text = "";
-        const time = new Date(1773646808544 + idx * 2000).toLocaleTimeString();
+    const currentLogs = useMemo(() => {
+        const safeSteps = Array.isArray(steps) ? steps : [];
+        const upto = Math.max(0, Math.min(currentIndex ?? 0, safeSteps.length - 1));
+        return safeSteps.slice(0, upto + 1).map((step, idx) => {
+            const isLast = idx === upto;
+            const narr = step?.narration || null;
+            const time = new Date(1773646808544 + idx * 2000).toLocaleTimeString();
 
-        if (idx === 0) {
-            text = "Initializing search space. Setting start distances to 0.";
-        } else {
-            const nodeLabel = step.node_label || step.node;
-            if (step.action === 'extract') {
-                text = isTechnical
-                    ? `Priority queue check. Node ${nodeLabel} (cost ${step.distance.toFixed(0)}) is optimal.`
-                    : `Extracting ${nodeLabel}: Found node with minimum accumulated cost. Expanding search frontier.`;
-            } else if (step.neighbors_updated?.length) {
-                const count = step.neighbors_updated.length;
-                text = isTechnical
-                    ? `Re-evaluating optimal path based on heuristic. ${count} neighbors checked.`
-                    : `Evaluating ${count} neighbors from ${nodeLabel}. Relaxing edges based on ${step.algorithm === 'astar' ? 'f(n) = g(n) + h(n)' : 'distance weights'}.`;
+            let headline = narr?.action_title || step?.explanation || step?.description || `Step ${idx + 1}`;
+            let body = '';
+            if (narr) {
+                body = isTechnical
+                    ? `${narr.why}\n\n${narr.summary}`
+                    : narr.summary || narr.why;
             } else {
-                text = `Processing ${nodeLabel}: Analyzing path efficiency...`;
+                body = step?.explanation || step?.description || '';
             }
-        }
 
-        return { id: idx, text, isLast, node: step.node, time };
-    });
+            return { id: idx, headline, body, isLast, time };
+        });
+    }, [steps, currentIndex, isTechnical]);
 
     const containerStyle = isMinimal ? { height: '100%', display: 'flex', flexDirection: 'column' } : {
         height: '100%', display: 'flex', flexDirection: 'column', background: 'rgba(15, 23, 42, 0.6)',
@@ -69,7 +65,10 @@ export default function ReasoningPanel({ steps, currentIndex, title = "Algorithm
                                 <div style={{ fontSize: '9px', fontWeight: 900, color: '#22d3ee', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>(Current step - active)</div>
                             )}
                             <span style={{ fontSize: '9px', color: '#64748b', display: 'block', fontStyle: 'italic', marginBottom: 2 }}>(Timestamp {log.time})</span>
-                            <p style={{ margin: 0, fontSize: '11px', color: log.isLast ? '#e2e8f0' : '#64748b', lineHeight: 1.6, fontWeight: log.isLast ? 600 : 400 }}>{log.text}</p>
+                            <p style={{ margin: 0, fontSize: '11px', color: log.isLast ? '#e2e8f0' : '#64748b', lineHeight: 1.55, fontWeight: log.isLast ? 750 : 500 }}>
+                                <span style={{ display: 'block', marginBottom: 6 }}>{log.headline}</span>
+                                <span style={{ display: 'block', whiteSpace: 'pre-wrap' }}>{log.body}</span>
+                            </p>
                         </motion.div>
                     ))}
                 </AnimatePresence>

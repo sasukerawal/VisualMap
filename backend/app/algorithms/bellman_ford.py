@@ -53,15 +53,36 @@ def bellman_ford(
     # Line 2: Relax V-1 rounds
     for round_num in range(1, V):
         relaxed_any = False
-        round_updates = []
+        round_updates = []  # backwards compatible: only updates
+        comparisons = []    # v2 narration: updates + non-updates
 
         # Line 3: Edge iteration
         for u, v, time_cost, phys_dist in edges:
             if dist[u] == float("inf"):
+                comparisons.append({
+                    "kind": "edge_check",
+                    "edge": {
+                        "from": u,
+                        "to": v,
+                        "time_cost": round(time_cost, 2),
+                        "physical_distance": round(phys_dist, 2),
+                    },
+                    "updated": False,
+                    "old_value": "inf" if dist[v] == float("inf") else round(dist[v], 2),
+                    "candidate_value": "inf",
+                    "new_value": "inf" if dist[v] == float("inf") else round(dist[v], 2),
+                    "old_parent": prev.get(v),
+                    "new_parent": prev.get(v),
+                    "note": f"Skip update: dist[{u}] is still infinity, so no path to {u} is known yet.",
+                })
                 continue
+
             new_dist = dist[u] + time_cost
             new_raw = raw_dist[u] + phys_dist
             # Line 4: Check Improvement
+            old_dist_v = dist[v]
+            old_raw_v = raw_dist[v]
+            old_prev_v = prev[v]
             if new_dist < dist[v]:
                 # Line 5: Relax
                 dist[v] = new_dist
@@ -78,12 +99,72 @@ def bellman_ford(
                     "node": v,
                     "relaxed": True
                 })
+                comparisons.append({
+                    "kind": "edge_check",
+                    "edge": {
+                        "from": u,
+                        "to": v,
+                        "time_cost": round(time_cost, 2),
+                        "physical_distance": round(phys_dist, 2),
+                    },
+                    "updated": True,
+                    "old_value": "inf" if old_dist_v == float("inf") else round(old_dist_v, 2),
+                    "candidate_value": round(new_dist, 2),
+                    "new_value": round(dist[v], 2),
+                    "old_raw": "inf" if old_raw_v == float("inf") else round(old_raw_v, 2),
+                    "candidate_raw": round(new_raw, 2),
+                    "new_raw": round(raw_dist[v], 2),
+                    "old_parent": old_prev_v,
+                    "new_parent": u,
+                    "note": "Distance improved, so we relax the edge and update predecessor.",
+                })
                 # Track visited nodes (order of first relaxation)
                 if v not in visited_set:
                     visited_set.add(v)
                     visited.append(v)
+            else:
+                comparisons.append({
+                    "kind": "edge_check",
+                    "edge": {
+                        "from": u,
+                        "to": v,
+                        "time_cost": round(time_cost, 2),
+                        "physical_distance": round(phys_dist, 2),
+                    },
+                    "updated": False,
+                    "old_value": "inf" if old_dist_v == float("inf") else round(old_dist_v, 2),
+                    "candidate_value": round(new_dist, 2),
+                    "new_value": "inf" if old_dist_v == float("inf") else round(old_dist_v, 2),
+                    "old_raw": "inf" if old_raw_v == float("inf") else round(old_raw_v, 2),
+                    "candidate_raw": round(new_raw, 2),
+                    "new_raw": "inf" if old_raw_v == float("inf") else round(old_raw_v, 2),
+                    "old_parent": old_prev_v,
+                    "new_parent": old_prev_v,
+                    "note": "No update: the candidate distance is not smaller than the current best-known distance.",
+                })
 
         step_counter += 1
+
+        why = (
+            f"Bellman-Ford performs repeated relaxation. In pass {round_num} of {V-1}, the algorithm checks every edge (u→v) "
+            f"to see whether dist[u] + w(u,v) improves dist[v]."
+        )
+        updates_count = len(round_updates)
+        summary = (
+            f"End of pass {round_num}: examined {len(comparisons)} edge(s). "
+            f"{updates_count} improvement(s) were found. "
+            + ("At least one value changed, so we continue to the next pass." if relaxed_any else "No values changed, so the solution has stabilized and we can stop early.")
+        )
+        changed_nodes = [u.get("node") for u in round_updates][:24]
+
+        preview_nodes = list(dict.fromkeys([start, end] + changed_nodes))[:12]
+        dist_preview = {}
+        parent_preview = {}
+        for n in preview_nodes:
+            dv = dist.get(n, float("inf"))
+            dist_preview[n] = "inf" if dv == float("inf") else round(dv, 2)
+            parent_preview[n] = prev.get(n)
+
         exploration_order.append({
             "step": step_counter,
             "node": f"round_{round_num}",
@@ -91,15 +172,31 @@ def bellman_ford(
             "round_num": round_num,
             "action": "relax_round",
             "active_line": 2, # Round expansion
-            "explanation": f"Round {round_num}: Checking all edges to see if any node's transit time can be improved by going through its neighbors.",
+            "explanation": why,
             "math_breakdown": {
-                "relaxations_found": len(round_updates)
+                "pass": round_num,
+                "edges_checked": len(comparisons),
+                "updates_found": len(round_updates),
             },
             "description": (
-                f"Round {round_num}: Relaxed {len(round_updates)} edge(s). "
-                + ("Distances improved." if relaxed_any else "No improvement — early stop.")
+                f"Pass {round_num}: Check every edge and relax any that improves a distance (Bellman-Ford)."
             ),
             "neighbors_updated": round_updates,
+            "narration": {
+                "action_title": f"Pass {round_num}: Relax all edges once",
+                "action_subtitle": "Bellman-Ford does not pick a 'best next node'. It repeatedly checks every edge for improvements.",
+                "why": why,
+                "comparisons": comparisons,
+                "summary": summary,
+                "state_after": {
+                    "pass_num": round_num,
+                    "passes_total": V - 1,
+                    "updates_in_step": updates_count,
+                    "changed_nodes": changed_nodes,
+                    "dist_preview": dist_preview,
+                    "parent_preview": parent_preview,
+                },
+            },
         })
 
         if not relaxed_any:
@@ -166,6 +263,7 @@ def _build_steps(exploration_order: list) -> list:
             "active_line": e.get("active_line"),
             "explanation": e.get("explanation"),
             "math_breakdown": e.get("math_breakdown"),
+            "narration": e.get("narration"),
         }
         for e in exploration_order
     ]

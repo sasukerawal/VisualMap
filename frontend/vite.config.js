@@ -12,4 +12,20 @@ export default defineConfig({
             },
         },
     },
+    build: {
+        rollupOptions: {
+            output: {
+                // Reduce initial JS parse/exec by splitting big libraries.
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) return;
+                    if (id.includes('/three')) return 'three';
+                    if (id.includes('@react-three')) return 'r3f';
+                    if (id.includes('/react-dom') || id.includes('/react/')) return 'react';
+                    if (id.includes('zustand')) return 'state';
+                    if (id.includes('axios')) return 'net';
+                    return 'vendor';
+                },
+            },
+        },
+    },
 });

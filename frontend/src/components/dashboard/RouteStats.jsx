@@ -2,6 +2,7 @@
  * RouteStats — displays route computation result metrics.
  */
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 
 function StatRow({ label, value, mono, color }) {
     return (
@@ -20,7 +21,17 @@ function StatRow({ label, value, mono, color }) {
 }
 
 export function RouteStats() {
-    const { routeResult, algorithm, isLoading, error, currentSegment, destinations } = useStore();
+    const { routeResult, algorithm, isLoading, error, currentSegment, destinations } = useStore(
+        (s) => ({
+            routeResult: s.routeResult,
+            algorithm: s.algorithm,
+            isLoading: s.isLoading,
+            error: s.error,
+            currentSegment: s.currentSegment,
+            destinations: s.destinations,
+        }),
+        shallow
+    );
 
     const algoLabels = { dijkstra: "Dijkstra's", astar: "A* Search", bellman_ford: "Bellman-Ford" };
 
@@ -52,19 +63,19 @@ export function RouteStats() {
                     {/* Time vs Distance */}
                     <StatRow
                         label="Transit Time"
-                        value={routeResult?.total_time ? `${routeResult.total_time.toFixed(1)}s` : null}
+                        value={routeResult?.total_time != null ? `${routeResult.total_time.toFixed(1)}s` : null}
                         mono
                         color="#d946ef"
                     />
                     <div style={{ height: 1, background: 'var(--border)' }} />
                     <StatRow
                         label="Physical Distance"
-                        value={routeResult?.total_physical_distance ? `${routeResult.total_physical_distance.toFixed(1)}m` : null}
+                        value={routeResult?.total_physical_distance != null ? `${routeResult.total_physical_distance.toFixed(1)}m` : null}
                         mono
                         color="#10b981"
                     />
 
-                    {routeResult?.total_time && routeResult?.total_physical_distance && (
+                    {routeResult?.total_time != null && routeResult?.total_physical_distance != null && (
                         <div style={{ marginTop: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(99,102,241,0.06)', borderRadius: 6, borderLeft: '3px solid #6366f1' }}>
                             <div style={{ fontSize: '10px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', marginBottom: 4 }}>
                                 Course of Path
@@ -128,7 +139,14 @@ export function RouteStats() {
 }
 
 function OrderModeToggle() {
-    const { orderMode, setOrderMode, isPlaying } = useStore();
+    const { orderMode, setOrderMode, isPlaying } = useStore(
+        (s) => ({
+            orderMode: s.orderMode,
+            setOrderMode: s.setOrderMode,
+            isPlaying: s.isPlaying,
+        }),
+        shallow
+    );
 
     return (
         <div className="card">

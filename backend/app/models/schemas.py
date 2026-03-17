@@ -3,7 +3,7 @@ Pydantic schemas for VisualMap API request / response models.
 """
 
 from __future__ import annotations
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 
@@ -101,6 +101,99 @@ class AlgoStep(BaseModel):
     explanation: Optional[str] = None
     active_line: Optional[int] = None
     math_breakdown: Optional[dict] = None
+    # v2 teaching narration payload (structured + lecture-style strings).
+    narration: Optional["AlgoNarration"] = None
+
+
+NumberLike = Union[float, str]
+
+
+class AlgoEdge(BaseModel):
+    from_node: str = Field(alias="from")
+    to_node: str = Field(alias="to")
+    time_cost: Optional[float] = None
+    physical_distance: Optional[float] = None
+    fuel_cost: Optional[float] = None
+    elev_delta: Optional[float] = None
+    fuel_multiplier: Optional[float] = None
+
+    model_config = {"populate_by_name": True}
+
+
+class AlgoComparison(BaseModel):
+    """
+    One comparison in a step (usually an edge relaxation check).
+    This is intentionally algorithm-agnostic; algorithm-specific fields are optional.
+    """
+    kind: Literal["edge_relaxation", "edge_check", "node_selection", "goal_check", "note"] = "edge_relaxation"
+    edge: Optional[AlgoEdge] = None
+    node: Optional[str] = None  # e.g. "current node u" for selection
+    updated: bool = False
+
+    # Core comparison numbers (Dijkstra/Bellman-Ford time distance).
+    old_value: Optional[NumberLike] = None
+    candidate_value: Optional[NumberLike] = None
+    new_value: Optional[NumberLike] = None
+
+    # Optional additional metrics.
+    old_raw: Optional[NumberLike] = None
+    candidate_raw: Optional[NumberLike] = None
+    new_raw: Optional[NumberLike] = None
+
+    old_fuel: Optional[NumberLike] = None
+    candidate_fuel: Optional[NumberLike] = None
+    new_fuel: Optional[NumberLike] = None
+
+    old_parent: Optional[str] = None
+    new_parent: Optional[str] = None
+
+    # A* specific: g/h/f scoring
+    old_g: Optional[NumberLike] = None
+    candidate_g: Optional[NumberLike] = None
+    new_g: Optional[NumberLike] = None
+    h: Optional[NumberLike] = None
+    old_f: Optional[NumberLike] = None
+    candidate_f: Optional[NumberLike] = None
+    new_f: Optional[NumberLike] = None
+
+    note: Optional[str] = None
+
+
+class AlgoStateSnapshot(BaseModel):
+    """
+    Small state snapshot after a step.
+    We keep it intentionally compact for performance.
+    """
+    settled: Optional[List[str]] = None
+    unsettled_frontier: Optional[List[dict]] = None  # [{node, key}]
+    open_set: Optional[List[dict]] = None            # A* open set top-k
+    closed_set: Optional[List[str]] = None           # A* closed nodes (small subset)
+    pass_num: Optional[int] = None                   # Bellman-Ford
+    passes_total: Optional[int] = None               # Bellman-Ford
+    updates_in_step: Optional[int] = None
+    changed_nodes: Optional[List[str]] = None
+    dist_preview: Optional[Dict[str, NumberLike]] = None
+    parent_preview: Optional[Dict[str, Optional[str]]] = None
+
+
+class AlgoNarration(BaseModel):
+    """
+    Lecture-style narration model:
+      - action: what is happening
+      - why: reason for the choice
+      - comparisons: what values were compared and what updated / did not
+      - summary: end-of-step summary for teaching
+      - state_after: compact algorithm state snapshot
+    """
+    action_title: str
+    action_subtitle: Optional[str] = None
+    why: str
+    comparisons: List[AlgoComparison] = []
+    summary: str
+    state_after: Optional[AlgoStateSnapshot] = None
+
+
+AlgoStep.model_rebuild()
 
 
 class StepsResponse(BaseModel):

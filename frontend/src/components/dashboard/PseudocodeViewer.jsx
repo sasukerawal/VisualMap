@@ -49,7 +49,8 @@ export default function PseudocodeViewer({ algorithm, currentStep, simpleMode = 
         return null;
     }, [currentStep?.active_line, algorithm]);
 
-    const explanation = currentStep?.explanation || currentStep?.description || '';
+    const narr = currentStep?.narration || null;
+    const explanation = narr?.why || currentStep?.explanation || currentStep?.description || '';
     const math = currentStep?.math_breakdown || null;
 
     const formatNumber = (n, digits = 2) =>
@@ -103,7 +104,17 @@ export default function PseudocodeViewer({ algorithm, currentStep, simpleMode = 
                         fontFamily: 'var(--font-sans)',
                         fontWeight: 650,
                     }}>
+                        {narr?.action_title ? (
+                            <div style={{ fontSize: 10, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#a7f3d0', marginBottom: 6 }}>
+                                {narr.action_title}
+                            </div>
+                        ) : null}
                         {explanation}
+                        {narr?.summary ? (
+                            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(148,163,184,0.14)', color: '#b7c7e6', fontSize: 10, lineHeight: 1.45 }}>
+                                {narr.summary}
+                            </div>
+                        ) : null}
                         {algorithm === 'astar' && typeof currentStep?.fuel_cost === 'number' && (
                             <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, fontFamily: '"JetBrains Mono", monospace', fontSize: 10, color: '#b7c7e6' }}>
                                 <span>time={formatNumber(currentStep.distance, 2) ?? '—'}s</span>

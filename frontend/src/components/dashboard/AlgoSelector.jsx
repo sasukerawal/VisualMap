@@ -3,6 +3,7 @@
  * Premium tabbed buttons with description previews.
  */
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 
 const ALGOS = [
     {
@@ -32,7 +33,14 @@ const ALGOS = [
 ];
 
 export function AlgoSelector() {
-    const { algorithm, setAlgorithm, isPlaying } = useStore();
+    const { algorithm, setAlgorithm, isPlaying } = useStore(
+        (s) => ({
+            algorithm: s.algorithm,
+            setAlgorithm: s.setAlgorithm,
+            isPlaying: s.isPlaying,
+        }),
+        shallow
+    );
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

@@ -7,6 +7,7 @@
  */
 import { useMemo } from 'react';
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 import { displayNodeName } from '../../data/townGraph';
 
 export function TablesTab() {
@@ -19,7 +20,19 @@ export function TablesTab() {
         deliveredNodes,
         currentSegment,
         routeResult,
-    } = useStore();
+    } = useStore(
+        (s) => ({
+            stepsResult: s.stepsResult,
+            algorithm: s.algorithm,
+            currentStepIndex: s.currentStepIndex,
+            learningMode: s.learningMode,
+            destinations: s.destinations,
+            deliveredNodes: s.deliveredNodes,
+            currentSegment: s.currentSegment,
+            routeResult: s.routeResult,
+        }),
+        shallow
+    );
 
     if (!stepsResult?.steps?.length) {
         return (
@@ -378,4 +391,3 @@ export function TablesTab() {
         </div>
     );
 }
-

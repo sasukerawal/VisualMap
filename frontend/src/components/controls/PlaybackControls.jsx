@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import useStore from '../../store/useStore';
+import { shallow } from 'zustand/shallow';
 import { computePath, computePathSteps } from '../../api/pathfinding';
 
 export function PlaybackControls() {
@@ -27,7 +28,34 @@ export function PlaybackControls() {
         setCurrentSegment,
         resetAnimation,
         resetAll,
-    } = useStore();
+    } = useStore(
+        (s) => ({
+            destinations: s.destinations,
+            algorithm: s.algorithm,
+            orderMode: s.orderMode,
+            isPlaying: s.isPlaying,
+            isPaused: s.isPaused,
+            animationSpeed: s.animationSpeed,
+            routeResult: s.routeResult,
+            currentSegment: s.currentSegment,
+            isLoading: s.isLoading,
+            error: s.error,
+            setIsPlaying: s.setIsPlaying,
+            setIsPaused: s.setIsPaused,
+            setAnimationSpeed: s.setAnimationSpeed,
+            setRouteResult: s.setRouteResult,
+            setStepsResult: s.setStepsResult,
+            setIsLoading: s.setIsLoading,
+            setError: s.setError,
+            setExploredNodes: s.setExploredNodes,
+            setExploredEdges: s.setExploredEdges,
+            setCurrentStepIndex: s.setCurrentStepIndex,
+            setCurrentSegment: s.setCurrentSegment,
+            resetAnimation: s.resetAnimation,
+            resetAll: s.resetAll,
+        }),
+        shallow
+    );
 
     const explorationTimer = useRef(null);
     const explorationSteps = useRef([]);
