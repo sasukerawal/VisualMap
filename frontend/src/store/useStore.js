@@ -83,7 +83,7 @@ const useStore = create((set, get) => ({
     hoveredEdgeKey: null, // `${from}-${to}`
     setHoveredEdgeKey: (k) => set({ hoveredEdgeKey: k || null }),
 
-    learningMode: 'intermediate', // 'beginner' | 'intermediate' | 'advanced'
+    learningMode: 'intermediate', // 'beginner' | 'intermediate' | 'advanced' | 'professor'
     setLearningMode: (mode) => set({ learningMode: mode }),
 
     setShowLabels: (v) => set({ showLabels: v }),

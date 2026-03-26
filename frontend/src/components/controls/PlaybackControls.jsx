@@ -12,7 +12,9 @@ export function PlaybackControls() {
         isPaused,
         animationSpeed,
         routeResult,
+        stepsResult,
         currentSegment,
+        currentStepIndex,
         isLoading,
         error,
         setIsPlaying,
@@ -37,7 +39,9 @@ export function PlaybackControls() {
             isPaused: s.isPaused,
             animationSpeed: s.animationSpeed,
             routeResult: s.routeResult,
+            stepsResult: s.stepsResult,
             currentSegment: s.currentSegment,
+            currentStepIndex: s.currentStepIndex,
             isLoading: s.isLoading,
             error: s.error,
             setIsPlaying: s.setIsPlaying,
@@ -157,8 +161,44 @@ export function PlaybackControls() {
 
             setExploredNodes(nh[idx]);
             setExploredEdges(eh[idx]);
+            setCurrentStepIndex(idx);
             stepIndex.current = idx + 1;
         }, intervalMs);
+    }
+
+    function clampStep(i) {
+        const len = stepsResult?.steps?.length || 0;
+        if (!len) return 0;
+        return Math.max(0, Math.min(len - 1, i));
+    }
+
+    function applyExplorationSnapshot(i) {
+        const { nodeHistory: nh, edgeHistory: eh } = explorationSteps.current || {};
+        if (!Array.isArray(nh) || !Array.isArray(eh)) return;
+        if (i < 0 || i >= nh.length) return;
+        setExploredNodes(nh[i]);
+        setExploredEdges(eh[i]);
+    }
+
+    function setStep(i) {
+        const next = clampStep(i);
+        stopExploration();
+        stepIndex.current = next;
+        setCurrentStepIndex(next);
+        applyExplorationSnapshot(next);
+    }
+
+    function isDecisionAction(action) {
+        return action === 'settle' || action === 'relax_round' || action === 'select' || action === 'expand';
+    }
+
+    function nextDecision() {
+        const steps = stepsResult?.steps || [];
+        if (!steps.length) return;
+        const start = clampStep((currentStepIndex ?? 0) + 1);
+        let i = start;
+        while (i < steps.length && !isDecisionAction(steps[i]?.action)) i += 1;
+        setStep(Math.min(i, steps.length - 1));
     }
 
     async function handleStart() {
@@ -260,33 +300,52 @@ export function PlaybackControls() {
                     {isLoading ? 'Computing route...' : destinations.length > 0 ? 'Start Navigation' : 'Add stops first'}
                 </button>
             ) : (
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                        onClick={() => setIsPaused(!isPaused)}
-                        style={{
-                            ...btnBase,
-                            flex: 1,
-                            padding: '14px',
-                            background: isPaused ? 'rgba(76,208,155,0.14)' : 'rgba(255,255,255,0.06)',
-                            color: isPaused ? '#7ef0b8' : '#dde7f5',
-                            border: `1px solid ${isPaused ? 'rgba(39,174,96,0.35)' : 'rgba(148,163,184,0.12)'}`,
-                        }}
-                    >
-                        {isPaused ? 'Resume' : 'Pause'}
-                    </button>
-                    <button
-                        onClick={handleReset}
-                        style={{
-                            ...btnBase,
-                            flex: 1,
-                            padding: '14px',
-                            background: 'rgba(220,50,50,0.08)',
-                            color: '#f39a9a',
-                            border: '1px solid rgba(220,50,50,0.2)',
-                        }}
-                    >
-                        Reset
-                    </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                            onClick={() => setIsPaused(!isPaused)}
+                            style={{
+                                ...btnBase,
+                                flex: 1,
+                                padding: '14px',
+                                background: isPaused ? 'rgba(76,208,155,0.14)' : 'rgba(255,255,255,0.06)',
+                                color: isPaused ? '#7ef0b8' : '#dde7f5',
+                                border: `1px solid ${isPaused ? 'rgba(39,174,96,0.35)' : 'rgba(148,163,184,0.12)'}`,
+                            }}
+                        >
+                            {isPaused ? 'Resume' : 'Pause'}
+                        </button>
+                        <button
+                            onClick={handleReset}
+                            style={{
+                                ...btnBase,
+                                flex: 1,
+                                padding: '14px',
+                                background: 'rgba(220,50,50,0.08)',
+                                color: '#f39a9a',
+                                border: '1px solid rgba(220,50,50,0.2)',
+                            }}
+                        >
+                            Reset
+                        </button>
+                    </div>
+
+                    {stepsResult?.steps?.length ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <button className="btn btn-ghost" onClick={() => setStep((currentStepIndex ?? 0) - 1)} style={{ height: 32, padding: '0 10px', fontSize: 11, borderRadius: 12 }}>
+                                Prev
+                            </button>
+                            <button className="btn btn-ghost" onClick={() => setStep((currentStepIndex ?? 0) + 1)} style={{ height: 32, padding: '0 10px', fontSize: 11, borderRadius: 12 }}>
+                                Next
+                            </button>
+                            <button className="btn" onClick={nextDecision} style={{ height: 32, padding: '0 10px', fontSize: 11, borderRadius: 12, fontWeight: 900, background: 'rgba(34,211,238,0.14)', border: '1px solid rgba(34,211,238,0.22)', color: '#d6f9ff' }}>
+                                Next Decision
+                            </button>
+                            <div style={{ marginLeft: 'auto', fontSize: 11, color: '#93a6c3', fontFamily: 'var(--font-mono)' }}>
+                                step {Math.min((currentStepIndex ?? 0) + 1, stepsResult.steps.length)} / {stepsResult.steps.length}
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             )}
 

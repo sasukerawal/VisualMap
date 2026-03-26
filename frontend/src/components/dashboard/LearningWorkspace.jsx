@@ -9,6 +9,8 @@ import { AlgoSelector } from './AlgoSelector';
 import { RouteStats } from './RouteStats';
 import { DeliveryList } from './DeliveryList';
 import { StateSpaceExplorer } from './StateSpaceExplorer';
+import { LecturePanel } from './LecturePanel';
+import { RoutingTab } from './RoutingTab';
 import { TheoryTab } from './TheoryTab';
 import { TheoryOverlay } from './TheoryOverlay';
 import { TablesTab } from './TablesTab';
@@ -18,9 +20,10 @@ import { NODES } from '../../data/townGraph';
 import { displayNodeName } from '../../data/townGraph';
 import { OfflineTutorOverlay } from '../tutor/OfflineTutorOverlay';
 
-const TABS = ['configuration', 'theory', 'tables'];
+const TABS = ['configuration', 'routing', 'theory', 'tables'];
 const TAB_LABELS = {
     configuration: 'Simulation',
+    routing: 'Routing',
     theory: 'Theory',
     tables: 'Tables'
 };
@@ -117,7 +120,7 @@ export function LearningWorkspace() {
 
                 {/* Learning Mode Selector with Framer Motion Layout */}
                 <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: 2, gap: 2, position: 'relative' }}>
-                    {['beginner', 'intermediate', 'advanced'].map(mode => (
+                    {['beginner', 'intermediate', 'advanced', 'professor'].map(mode => (
                         <button
                             key={mode}
                             onClick={() => setLearningMode(mode)}
@@ -241,6 +244,9 @@ export function LearningWorkspace() {
                                         {activeTab === 'configuration' && (
                                             <>
                                                 <AlgoSelector />
+                                                {(stepsResult || destinations.length >= 2) && (
+                                                    <LecturePanel />
+                                                )}
                                                 {destinations.length < 2 && !routeResult ? (
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12, textAlign: 'center', color: 'var(--text-secondary)', padding: '16px' }}>
                                                         <div style={{ width: 42, height: 42, borderRadius: 14, display: 'grid', placeItems: 'center', border: '1px solid rgba(99,120,255,0.22)', background: 'rgba(99,120,255,0.10)', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
@@ -423,6 +429,7 @@ export function LearningWorkspace() {
                                                 )}
                                             </div>
                                         )}
+                                        {activeTab === 'routing' && <RoutingTab />}
                                         {activeTab === 'tables' && <TablesTab />}
                                     </motion.div>
                                 </AnimatePresence>
