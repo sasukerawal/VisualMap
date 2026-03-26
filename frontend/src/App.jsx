@@ -78,15 +78,26 @@ function GlassBadge({ children, style }) {
 }
 
 function SceneOverlays() {
-    const { isPlaying, routeResult, destinations, currentSegment } = useStore(
+    const { isPlaying, routeResult, destinations, currentSegment, deliveredNodes } = useStore(
         (s) => ({
             isPlaying: s.isPlaying,
             routeResult: s.routeResult,
             destinations: s.destinations,
             currentSegment: s.currentSegment,
+            deliveredNodes: s.deliveredNodes,
         }),
         shallow
     );
+
+    const deliveriesDone = Math.min(deliveredNodes?.length || 0, destinations?.length || 0);
+    const deliveriesTotal = destinations?.length || 0;
+
+    const missionStatus = useMemo(() => {
+        if (!isPlaying) return null;
+        if (deliveriesTotal <= 0) return null;
+        if (deliveriesDone < deliveriesTotal) return `Out for delivery — ${deliveriesDone}/${deliveriesTotal} delivered`;
+        return 'Deliveries complete — returning to warehouse';
+    }, [isPlaying, deliveriesDone, deliveriesTotal]);
     const uiOverlayOpen = useStore((s) => s.isUiOverlayOpen);
 
     if (uiOverlayOpen) return null;
@@ -142,7 +153,7 @@ function SceneOverlays() {
                         }}
                     />
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#8ef3c2' }}>
-                        Navigating — {currentSegment}/{destinations.length} stops
+                        {missionStatus || `Navigating — leg ${Math.min((currentSegment || 0) + 1, (routeResult?.segments?.length || 1))}/${routeResult?.segments?.length || 1}`}
                     </span>
                 </GlassBadge>
             )}

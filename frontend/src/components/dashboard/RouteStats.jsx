@@ -21,7 +21,7 @@ function StatRow({ label, value, mono, color }) {
 }
 
 export function RouteStats() {
-    const { routeResult, algorithm, isLoading, error, currentSegment, destinations } = useStore(
+    const { routeResult, algorithm, isLoading, error, currentSegment, destinations, deliveredNodes, isPlaying } = useStore(
         (s) => ({
             routeResult: s.routeResult,
             algorithm: s.algorithm,
@@ -29,11 +29,22 @@ export function RouteStats() {
             error: s.error,
             currentSegment: s.currentSegment,
             destinations: s.destinations,
+            deliveredNodes: s.deliveredNodes,
+            isPlaying: s.isPlaying,
         }),
         shallow
     );
 
     const algoLabels = { dijkstra: "Dijkstra's", astar: "A* Search", bellman_ford: "Bellman-Ford" };
+    const deliveriesDone = Math.min(deliveredNodes?.length || 0, destinations?.length || 0);
+    const deliveriesTotal = destinations?.length || 0;
+    const missionLabel = (() => {
+        if (!routeResult || deliveriesTotal <= 0) return null;
+        if (isPlaying) {
+            return deliveriesDone < deliveriesTotal ? 'Out for delivery' : 'Returning to warehouse';
+        }
+        return deliveriesDone >= deliveriesTotal ? 'Mission complete' : 'Ready';
+    })();
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -105,9 +116,15 @@ export function RouteStats() {
                     />
                     <div style={{ height: 1, background: 'var(--border)' }} />
                     <StatRow
-                        label="Stops"
-                        value={destinations.length > 0 ? `${currentSegment} / ${destinations.length}` : null}
+                        label="Deliveries"
+                        value={destinations.length > 0 ? `${deliveriesDone} / ${destinations.length}` : null}
                         color="var(--accent-cyan)"
+                    />
+                    <div style={{ height: 1, background: 'var(--border)' }} />
+                    <StatRow
+                        label="Mission"
+                        value={missionLabel}
+                        color="var(--accent-green)"
                     />
                 </div>
             </div>

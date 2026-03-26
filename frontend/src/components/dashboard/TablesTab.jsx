@@ -20,6 +20,7 @@ export function TablesTab() {
         deliveredNodes,
         currentSegment,
         routeResult,
+        isPlaying,
     } = useStore(
         (s) => ({
             stepsResult: s.stepsResult,
@@ -30,6 +31,7 @@ export function TablesTab() {
             deliveredNodes: s.deliveredNodes,
             currentSegment: s.currentSegment,
             routeResult: s.routeResult,
+            isPlaying: s.isPlaying,
         }),
         shallow
     );
@@ -195,8 +197,9 @@ export function TablesTab() {
                     <div className="custom-scroll" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
                         {stops.map((id, idx) => {
                             const isWarehouse = idx === 0;
+                            const isReturnLeg = (destinations?.length || 0) > 0 && (routeResult?.segments?.length || 0) === (destinations.length + 1) && (currentSegment === destinations.length);
                             const isDelivered = !isWarehouse && deliveredNodes.includes(id);
-                            const isNext = !isWarehouse && idx === (currentSegment || 0) + 1;
+                            const isNext = (!isWarehouse && idx === (currentSegment || 0) + 1) || (isWarehouse && isReturnLeg && isPlaying);
                             return (
                                 <div
                                     key={id + idx}
@@ -222,6 +225,8 @@ export function TablesTab() {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                                         {isDelivered ? (
                                             <span style={{ fontSize: 11, fontWeight: 900, color: '#86efac' }}>Delivered</span>
+                                        ) : isWarehouse && isNext ? (
+                                            <span style={{ fontSize: 11, fontWeight: 900, color: '#67e8f9' }}>Returning</span>
                                         ) : isNext ? (
                                             <span style={{ fontSize: 11, fontWeight: 900, color: '#67e8f9' }}>In Progress</span>
                                         ) : (

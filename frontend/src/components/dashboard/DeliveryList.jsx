@@ -6,16 +6,27 @@ import { shallow } from 'zustand/shallow';
 import { NODES } from '../../data/townGraph';
 
 export function DeliveryList() {
-    const { destinations, removeDestination, clearDestinations, deliveredNodes, isPlaying } = useStore(
+    const { destinations, removeDestination, clearDestinations, deliveredNodes, isPlaying, routeResult } = useStore(
         (s) => ({
             destinations: s.destinations,
             removeDestination: s.removeDestination,
             clearDestinations: s.clearDestinations,
             deliveredNodes: s.deliveredNodes,
             isPlaying: s.isPlaying,
+            routeResult: s.routeResult,
         }),
         shallow
     );
+
+    const deliveriesDone = Math.min(deliveredNodes?.length || 0, destinations?.length || 0);
+    const hasReturnLeg = Array.isArray(routeResult?.segments) && routeResult.segments.some((s) => s?.leg_type === 'return');
+    const returnStatus = deliveriesDone < destinations.length
+        ? 'Pending'
+        : isPlaying
+            ? 'Returning'
+            : hasReturnLeg
+                ? 'Complete'
+                : 'Pending';
 
     return (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -91,6 +102,39 @@ export function DeliveryList() {
                             </div>
                         );
                     })}
+
+                    {/* Required final leg: return to warehouse */}
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '7px 10px',
+                            background: returnStatus === 'Complete'
+                                ? 'rgba(34,211,238,0.08)'
+                                : returnStatus === 'Returning'
+                                    ? 'rgba(46,204,113,0.08)'
+                                    : 'rgba(99,120,255,0.04)',
+                            border: `1px solid ${returnStatus === 'Complete'
+                                ? 'rgba(34,211,238,0.25)'
+                                : returnStatus === 'Returning'
+                                    ? 'rgba(46,204,113,0.22)'
+                                    : 'rgba(99,120,255,0.10)'}`,
+                            borderRadius: 8,
+                        }}
+                    >
+                        <span style={{ fontSize: '13px', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', minWidth: 20 }}>
+                            {destinations.length + 1}
+                        </span>
+                        <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: '12px', fontWeight: 600, color: '#d6f9ff', margin: 0 }}>
+                                {returnStatus === 'Complete' ? '✓ ' : ''}Return to Warehouse
+                            </p>
+                            <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '1px 0 0', fontFamily: 'var(--font-mono)' }}>
+                                Status: {returnStatus}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

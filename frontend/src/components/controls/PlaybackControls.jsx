@@ -79,20 +79,22 @@ export function PlaybackControls() {
         // 0: warehouse->dest[0], 1: dest[0]->dest[1], etc.
         if (!isPlaying || !routeResult || !destinations?.length) return;
         if (currentSegment == null) return;
-        if (currentSegment >= destinations.length) return; // completed
+        const segCount = routeResult?.segments?.length || 0;
+        if (segCount <= 0) return;
+        if (currentSegment >= segCount) return; // completed (includes required return-to-warehouse leg)
 
         if (lastLoadedSegment.current === currentSegment) return;
         lastLoadedSegment.current = currentSegment;
 
         (async () => {
             try {
-                const stepsRes = await computePathSteps({
-                    algorithm,
-                    start: 'warehouse',
-                    destinations,
-                    orderMode,
-                    segmentIndex: currentSegment,
-                });
+                    const stepsRes = await computePathSteps({
+                        algorithm,
+                        start: 'warehouse',
+                        destinations,
+                        orderMode,
+                        segmentIndex: currentSegment,
+                    });
 
                 setStepsResult(stepsRes);
                 setCurrentStepIndex(0);

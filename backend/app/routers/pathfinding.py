@@ -212,7 +212,8 @@ async def compute_path(req: PathRequest):
     else:
         ordered_dests = list(req.destinations)
 
-    # Chain path: warehouse -> d1 -> d2 -> ... -> dN
+    # Chain path (closed mission):
+    #   warehouse -> d1 -> d2 -> ... -> dN -> warehouse
     full_path: List[str] = []
     all_visited: List[str] = []
     all_exploration: list = []
@@ -222,6 +223,9 @@ async def compute_path(req: PathRequest):
     step_offset = 0
 
     stops = [req.start] + ordered_dests
+    # REQUIRED return leg: append warehouse only after delivery order is finalized.
+    if ordered_dests:
+        stops.append(req.start)
     for i in range(len(stops) - 1):
         seg_start = stops[i]
         seg_end = stops[i + 1]
@@ -255,6 +259,7 @@ async def compute_path(req: PathRequest):
             "to": stops[i + 1],
             "path": result["path"],
             "distance": result["total_distance"],
+            "leg_type": "return" if (ordered_dests and i == len(stops) - 2) else "delivery",
         })
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -298,6 +303,8 @@ async def compute_path_steps(req: PathRequest):
         raise HTTPException(status_code=422, detail="segment_index must be >= 0")
 
     stops = [req.start] + ordered_dests
+    if ordered_dests:
+        stops.append(req.start)
     if segment_index >= len(stops) - 1:
         raise HTTPException(status_code=422, detail=f"segment_index out of range (max {len(stops) - 2})")
 

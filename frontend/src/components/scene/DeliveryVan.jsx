@@ -19,6 +19,7 @@ export function DeliveryVan() {
     const chassisRef = useRef();
     const progressRef = useRef(0);
     const segmentRef = useRef(0);
+    const legIndexRef = useRef(0);
     const tmpPosRef = useRef(new THREE.Vector3());
 
     const {
@@ -30,7 +31,6 @@ export function DeliveryVan() {
         setCurrentSegment,
         addDelivered,
         setIsPlaying,
-        destinations,
     } = useStore(
         (s) => ({
             routeResult: s.routeResult,
@@ -41,7 +41,6 @@ export function DeliveryVan() {
             setCurrentSegment: s.setCurrentSegment,
             addDelivered: s.addDelivered,
             setIsPlaying: s.setIsPlaying,
-            destinations: s.destinations,
         }),
         shallow
     );
@@ -57,10 +56,32 @@ export function DeliveryVan() {
         })
     ), [path.join('|')]);
 
+    const legBoundaries = useMemo(() => {
+        const segs = routeResult?.segments || [];
+        if (!Array.isArray(segs) || segs.length === 0) return [];
+
+        let endIdx = -1;
+        let last = null;
+
+        return segs.map((seg) => {
+            const p = Array.isArray(seg?.path) ? seg.path : [];
+            let stepLen = p.length;
+            if (endIdx >= 0 && last && p.length > 0 && p[0] === last) stepLen = Math.max(0, stepLen - 1);
+            endIdx += stepLen;
+            last = p.length > 0 ? p[p.length - 1] : last;
+            return {
+                endIndex: endIdx,
+                to: seg?.to,
+                legType: seg?.leg_type || 'delivery',
+            };
+        });
+    }, [routeResult]);
+
     // Reset when new route computed
     useEffect(() => {
         progressRef.current = 0;
         segmentRef.current = 0;
+        legIndexRef.current = 0;
         if (vanRef.current && waypoints.length > 0) {
             vanRef.current.position.copy(waypoints[0]);
         }
@@ -88,9 +109,23 @@ export function DeliveryVan() {
             setCurrentPathIndex(segmentRef.current);
 
             const arrivedNodeId = path[segmentRef.current];
-            if (arrivedNodeId && destinations.includes(arrivedNodeId)) {
-                addDelivered(arrivedNodeId);
-                setCurrentSegment(destinations.indexOf(arrivedNodeId) + 1);
+            // Advance "active leg" when we reach the end of a segment.
+            // This is based on routeResult.segments (respects optimized ordering),
+            // and includes the required final return-to-warehouse leg.
+            while (
+                legIndexRef.current < legBoundaries.length &&
+                segmentRef.current >= legBoundaries[legIndexRef.current].endIndex
+            ) {
+                const leg = legBoundaries[legIndexRef.current];
+                if (leg.legType !== 'return' && leg.to && leg.to !== 'warehouse') {
+                    addDelivered(leg.to);
+                }
+
+                const nextLegIndex = legIndexRef.current + 1;
+                if (nextLegIndex < legBoundaries.length) {
+                    setCurrentSegment(nextLegIndex);
+                }
+                legIndexRef.current = nextLegIndex;
             }
         }
 

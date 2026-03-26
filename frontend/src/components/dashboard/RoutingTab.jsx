@@ -57,7 +57,8 @@ export function RoutingTab() {
                         <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9fc7ff' }}>Route overview</div>
                         <div style={{ marginTop: 6, fontSize: 12, color: '#cbd5e1', lineHeight: 1.6 }}>
                             <strong style={{ color: '#eef2ff' }}>Order mode:</strong> {orderMode === 'optimized' ? 'Optimized (nearest-neighbor)' : 'Manual'}
-                            {' '}• <strong style={{ color: '#eef2ff' }}>Stops:</strong> {destinations.length}
+                            {' '} - <strong style={{ color: '#eef2ff' }}>Deliveries:</strong> {destinations.length}
+                            {' '} - <strong style={{ color: '#eef2ff' }}>Legs:</strong> {routeResult?.segments?.length || 0}
                         </div>
                     </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#d6f9ff' }}>
@@ -69,7 +70,7 @@ export function RoutingTab() {
                     {routeResult.segments.map((s, idx) => (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '10px 10px', borderRadius: 12, border: '1px solid rgba(148,163,184,0.12)', background: 'rgba(255,255,255,0.02)' }}>
                             <div style={{ fontSize: 12, fontWeight: 900, color: '#eef2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {idx + 1}. {displayNodeName(s.from)} → {displayNodeName(s.to)}
+                                {idx + 1}. {s.leg_type === 'return' ? `Return to Warehouse — ${displayNodeName(s.from)} → ${displayNodeName(s.to)}` : `${displayNodeName(s.from)} → ${displayNodeName(s.to)}`}
                             </div>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#9fb0ca' }}>
                                 {typeof s.distance === 'number' ? s.distance.toFixed(2) : s.distance}
@@ -82,6 +83,7 @@ export function RoutingTab() {
                     {orderMode === 'optimized'
                         ? 'Optimized ordering uses a simple nearest-neighbor idea: from the current stop, pick the next unvisited stop with the smallest estimated travel cost.'
                         : 'Manual ordering respects the order you clicked stops. The route is computed segment-by-segment in that sequence.'}
+                    {' '}After the final delivery, the truck must return to the warehouse to complete the mission.
                 </div>
             </div>
 
@@ -137,4 +139,3 @@ export function RoutingTab() {
         </div>
     );
 }
-

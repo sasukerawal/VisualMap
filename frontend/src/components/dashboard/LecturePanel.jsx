@@ -254,6 +254,7 @@ export function LecturePanel() {
     const narr = step?.narration || null;
     const optimization = stepsResult?.optimization_target || null;
     const lintWarnings = Array.isArray(stepsResult?.lint_warnings) ? stepsResult.lint_warnings : [];
+    const isReturnSegment = destinations?.length > 0 && typeof currentSegment === 'number' && currentSegment === destinations.length;
 
     const [collapsed, setCollapsed] = useState(false);
     const [compareOpen, setCompareOpen] = useState(false);
@@ -375,6 +376,20 @@ export function LecturePanel() {
                                         {w}
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {isReturnSegment && (
+                        <div className="card" style={{ borderRadius: 14, padding: '12px 12px', background: 'rgba(46,204,113,0.08)', borderColor: 'rgba(46,204,113,0.22)' }}>
+                            <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b7f7d2' }}>
+                                Return leg
+                            </div>
+                            <div style={{ marginTop: 6, fontSize: 11, color: '#cbd5e1', lineHeight: 1.55 }}>
+                                All deliveries are complete. The truck now returns to the warehouse using <strong style={{ color: '#eef2ff' }}>{algorithm === 'astar' ? 'A*' : algorithm === 'bellman_ford' ? 'Bellman-Ford' : 'Dijkstra'}</strong>, the same shortest-path algorithm selected for earlier legs.
+                            </div>
+                            <div style={{ marginTop: 6, fontSize: 11, color: '#9fb0ca', lineHeight: 1.55 }}>
+                                The warehouse is not treated as another delivery stop; it is the required return destination that closes the trip.
                             </div>
                         </div>
                     )}

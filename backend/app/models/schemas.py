@@ -29,7 +29,7 @@ class PathRequest(BaseModel):
     )
     segment_index: Optional[int] = Field(
         default=None,
-        description="Optional segment index for step-by-step trace: 0=warehouse→dest[0], 1=dest[0]→dest[1], ..."
+        description="Optional segment index for step-by-step trace: 0=warehouse→dest[0], 1=dest[0]→dest[1], ..., N=dest[N-1]→warehouse (return)"
     )
 
 
@@ -50,6 +50,7 @@ class PathSegment(BaseModel):
     to_node: str   = Field(alias="to")
     path: List[str]
     distance: float
+    leg_type: Optional[Literal["delivery", "return"]] = None
 
     model_config = {"populate_by_name": True}
 
