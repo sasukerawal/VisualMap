@@ -167,6 +167,7 @@ def bellman_ford(
 
         exploration_order.append({
             "step": step_counter,
+            "step_type": "pass_relax",
             "node": f"round_{round_num}",
             "distance": 0,
             "round_num": round_num,
@@ -207,6 +208,48 @@ def bellman_ford(
         if dist[u] != float("inf") and dist[u] + time_cost < dist[v]:
             negative_cycle = True
             break
+
+    # Explicit cycle-check step for teaching.
+    step_counter += 1
+    cycle_why = (
+        "After |V|-1 passes, Bellman-Ford does one extra check: "
+        "if any edge can still relax (dist[u] + w(u,v) < dist[v]), "
+        "then a reachable negative-weight cycle exists."
+    )
+    cycle_summary = (
+        "Negative cycle detected: some shortest paths are undefined because costs can decrease forever by cycling."
+        if negative_cycle
+        else "No negative cycle detected: shortest-path distances are well-defined."
+    )
+    exploration_order.append({
+        "step": step_counter,
+        "step_type": "negative_cycle_check",
+        "node": "cycle_check",
+        "distance": 0,
+        "action": "negative_cycle_check",
+        "active_line": 4,
+        "explanation": cycle_why,
+        "math_breakdown": {
+            "pass": V - 1,
+            "check": "∃(u,v): dist[u] + w(u,v) < dist[v]",
+            "negative_cycle_detected": negative_cycle,
+        },
+        "description": "Cycle check: verify whether any edge can still relax after the main passes.",
+        "neighbors_updated": [],
+        "narration": {
+            "action_title": "Negative cycle check",
+            "action_subtitle": "If an edge can still relax after |V|-1 passes, a reachable negative-weight cycle exists.",
+            "why": cycle_why,
+            "comparisons": [],
+            "summary": cycle_summary,
+            "state_after": {
+                "pass_num": V - 1,
+                "passes_total": V - 1,
+                "updates_in_step": 0,
+                "negative_cycle_detected": negative_cycle,
+            },
+        },
+    })
 
     # Reconstruct path
     path: List[str] = []
@@ -255,6 +298,7 @@ def _build_steps(exploration_order: list) -> list:
         {
             "step": e["step"],
             "action": e["action"],
+            "step_type": e.get("step_type"),
             "node": e["node"],
             "distance": e["distance"],
             "round_num": e.get("round_num"),

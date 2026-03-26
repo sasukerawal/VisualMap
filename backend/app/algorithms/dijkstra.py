@@ -162,6 +162,7 @@ def dijkstra(
 
         exploration_order.append({
             "step": step_counter,
+            "step_type": "select_node",
             "node": u,
             "distance": round(d, 2), # time cost
             "raw_distance": round(raw_dist[u], 2), # physical dist
@@ -197,6 +198,7 @@ def dijkstra(
         # Line 4: Check if goal
         if u == end:
             exploration_order[-1]["active_line"] = 4
+            exploration_order[-1]["step_type"] = "goal_reached"
             exploration_order[-1]["explanation"] = (
                 f"Goal check: we settled {node_label}, and it is the destination. "
                 f"Because Dijkstra only settles a vertex when its shortest distance is confirmed, "
@@ -250,6 +252,7 @@ def _build_steps(exploration_order: list, algorithm: str) -> list:
         {
             "step": e["step"],
             "action": e["action"],
+            "step_type": e.get("step_type"),
             "node": e["node"],
             "distance": e["distance"],
             "raw_distance": e.get("raw_distance"),

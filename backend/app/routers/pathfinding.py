@@ -22,6 +22,82 @@ router = APIRouter(prefix="/api")
 # ADJ is pre-built in town_graph.py respecting one-way edges
 
 
+def _optimization_target(algorithm: str) -> dict:
+    """
+    Human-facing run metadata so the UI can always state what is being optimized
+    and what key the frontier/queue is ordered by.
+    """
+    if algorithm == "astar":
+        return {
+            "metric": "fuel",
+            "units": "fuel",
+            "queue_key": "f_fuel = g_fuel + h",
+            "note": "This run optimizes a fuel proxy. A* selects the open-set node with minimum f_fuel.",
+        }
+    if algorithm == "bellman_ford":
+        return {
+            "metric": "time",
+            "units": "s",
+            "queue_key": "pass i (relax all edges)",
+            "note": "This run optimizes travel time. Bellman-Ford relaxes every edge each pass; ordering is by pass, not a frontier key.",
+        }
+    return {
+        "metric": "time",
+        "units": "s",
+        "queue_key": "dist[u] (tentative time)",
+        "note": "This run optimizes travel time. Dijkstra settles the unsettled node with minimum dist[u].",
+    }
+
+
+def _lint_step_text(steps: list, algorithm: str) -> List[str]:
+    """
+    Lightweight content lint: warns if narration accidentally references a different algorithm.
+    (Does not block the response; the UI can surface warnings in Professor mode.)
+    """
+    if not steps:
+        return []
+
+    allowed = {
+        "dijkstra": ["dijkstra"],
+        "astar": ["a*", "astar"],
+        "bellman_ford": ["bellman", "bellman-ford", "bellman ford"],
+    }.get(algorithm, [])
+
+    forbidden_map = {
+        "dijkstra": ["a*", "astar", "bellman"],
+        "astar": ["dijkstra", "bellman"],
+        "bellman_ford": ["dijkstra", "a*", "astar"],
+    }.get(algorithm, [])
+
+    warnings: List[str] = []
+
+    def consider(text: str, step_idx: int):
+        t = (text or "").lower()
+        for bad in forbidden_map:
+            if bad in t:
+                warnings.append(f"Step {step_idx + 1}: narration mentions '{bad}' but run algorithm is '{algorithm}'.")
+                break
+
+    for idx, s in enumerate(steps):
+        narr = (s or {}).get("narration") or {}
+        consider(narr.get("action_title", ""), idx)
+        consider(narr.get("action_subtitle", ""), idx)
+        consider(narr.get("why", ""), idx)
+        consider(narr.get("summary", ""), idx)
+
+        for c in (narr.get("comparisons") or []):
+            consider((c or {}).get("note", ""), idx)
+
+        # Ensure at least one allowed token appears somewhere for clarity (warning only).
+        if allowed:
+            combined = " ".join([narr.get("action_title", ""), narr.get("action_subtitle", ""), narr.get("summary", "")]).lower()
+            if not any(a in combined for a in allowed):
+                warnings.append(f"Step {idx + 1}: narration does not name the algorithm ({algorithm}). Consider adding a short label.")
+
+    # De-dupe but keep order.
+    return list(dict.fromkeys(warnings))[:24]
+
+
 # ---------------------------------------------------------------------------
 # Algorithm dispatcher
 # ---------------------------------------------------------------------------
@@ -230,9 +306,12 @@ async def compute_path_steps(req: PathRequest):
 
     result = _run_algorithm(req.algorithm, seg_start, seg_end)
     tree_nodes, tree_edges = _build_tree(result.get("steps", []), req.algorithm)
+    lint_warnings = _lint_step_text(result.get("steps", []), req.algorithm)
 
     return StepsResponse(
         algorithm=req.algorithm,
+        optimization_target=_optimization_target(req.algorithm),
+        lint_warnings=lint_warnings or None,
         steps=result.get("steps", []),
         tree_nodes=tree_nodes,
         tree_edges=tree_edges,

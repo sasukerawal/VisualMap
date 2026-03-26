@@ -236,6 +236,7 @@ def astar(
 
         exploration_order.append({
             "step": step_counter,
+            "step_type": "select_node",
             "node": u,
             "distance": round(g_time[u], 2), # time so far (seconds proxy)
             "raw_distance": round(g_raw[u], 2),
@@ -277,6 +278,7 @@ def astar(
         if u == end:
             # Update the last entry to indicate goal reached
             exploration_order[-1]["active_line"] = 5
+            exploration_order[-1]["step_type"] = "goal_reached"
             exploration_order[-1]["explanation"] = (
                 f"Goal check: the selected node {node_label} is the destination. "
                 f"A* stops and reconstructs the path from predecessor links."
@@ -329,6 +331,7 @@ def _build_steps(exploration_order: list) -> list:
         {
             "step": e["step"],
             "action": e["action"],
+            "step_type": e.get("step_type"),
             "node": e["node"],
             "distance": e["distance"],
             "raw_distance": e.get("raw_distance"),

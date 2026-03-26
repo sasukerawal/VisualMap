@@ -88,6 +88,7 @@ class TreeEdge(BaseModel):
 class AlgoStep(BaseModel):
     step: int
     action: str
+    step_type: Optional[str] = None
     node: str
     distance: float
     raw_distance: Optional[float] = None
@@ -174,6 +175,7 @@ class AlgoStateSnapshot(BaseModel):
     changed_nodes: Optional[List[str]] = None
     dist_preview: Optional[Dict[str, NumberLike]] = None
     parent_preview: Optional[Dict[str, Optional[str]]] = None
+    negative_cycle_detected: Optional[bool] = None
 
 
 class AlgoNarration(BaseModel):
@@ -198,6 +200,8 @@ AlgoStep.model_rebuild()
 
 class StepsResponse(BaseModel):
     algorithm: str
+    optimization_target: Optional[dict] = None
+    lint_warnings: Optional[List[str]] = None
     steps: List[AlgoStep]
     tree_nodes: List[TreeNode]
     tree_edges: List[TreeEdge]

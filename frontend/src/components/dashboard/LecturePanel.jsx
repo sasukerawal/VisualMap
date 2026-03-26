@@ -252,6 +252,8 @@ export function LecturePanel() {
     const steps = stepsResult?.steps || [];
     const step = steps?.[currentStepIndex] || null;
     const narr = step?.narration || null;
+    const optimization = stepsResult?.optimization_target || null;
+    const lintWarnings = Array.isArray(stepsResult?.lint_warnings) ? stepsResult.lint_warnings : [];
 
     const [collapsed, setCollapsed] = useState(false);
     const [compareOpen, setCompareOpen] = useState(false);
@@ -327,6 +329,18 @@ export function LecturePanel() {
                     <div style={{ marginTop: 4, fontSize: 12, fontWeight: 900, color: '#eef2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {narr?.action_title || `Step ${step?.step ?? currentStepIndex + 1}`}
                     </div>
+                    <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                        {step?.step_type && (
+                            <span className="badge badge-blue" style={{ borderRadius: 999, fontSize: 9 }}>
+                                {String(step.step_type).replaceAll('_', ' ')}
+                            </span>
+                        )}
+                        {optimization?.metric && optimization?.queue_key && (
+                            <span style={{ fontSize: 10, color: '#9fb0ca', lineHeight: 1.4 }}>
+                                <strong style={{ color: '#eef2ff' }}>Optimizing:</strong> {optimization.metric} • <strong style={{ color: '#eef2ff' }}>Key:</strong> {optimization.queue_key}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button className="btn btn-ghost" onClick={() => setCompareOpen((v) => !v)} style={{ height: 30, padding: '0 10px', fontSize: 11, borderRadius: 10 }}>
@@ -340,6 +354,21 @@ export function LecturePanel() {
 
             {!collapsed && (
                 <div style={{ padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {mode === 'professor' && lintWarnings.length > 0 && (
+                        <div className="card" style={{ borderRadius: 14, padding: '12px 12px', background: 'rgba(248,113,113,0.08)', borderColor: 'rgba(248,113,113,0.22)' }}>
+                            <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fecaca' }}>
+                                Narration lint
+                            </div>
+                            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {lintWarnings.slice(0, 6).map((w, i) => (
+                                    <div key={i} style={{ fontSize: 11, color: '#fca5a5', lineHeight: 1.45 }}>
+                                        {w}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {narr?.action_subtitle && mode !== 'beginner' && (
                         <div style={{ fontSize: 11, color: '#9fb0ca', lineHeight: 1.55 }}>{narr.action_subtitle}</div>
                     )}
@@ -425,4 +454,3 @@ export function LecturePanel() {
         </div>
     );
 }
-
