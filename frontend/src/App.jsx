@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { TownScene } from './components/scene/TownScene';
 import { LearningWorkspace } from './components/dashboard/LearningWorkspace';

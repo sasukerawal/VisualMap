@@ -2,7 +2,7 @@
  * Zustand global store for VisualMap
  * Manages: destinations, algorithm selection, route result, animation state
  */
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 
 function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(hi, v));
@@ -11,7 +11,7 @@ function clamp(v, lo, hi) {
 // Keep rAF ids out of Zustand state to avoid per-frame store updates.
 let timelineRafId = 0;
 
-const useStore = create((set, get) => ({
+const useStore = createWithEqualityFn((set, get) => ({
     // ── Algorithm ────────────────────────────────────────────────────────────
     algorithm: 'dijkstra',  // 'dijkstra' | 'astar' | 'bellman_ford'
     setAlgorithm: (algo) => set({ algorithm: algo }),
