@@ -3,10 +3,12 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 
-export const NodeMarker = memo(function NodeMarker({ nodeId, position, label, isExplored, isOnPath }) {
+export const NodeMarker = memo(function NodeMarker({ nodeId, position, label, isExplored, isOnPath, isActive }) {
     const meshRef = useRef();
+    const haloRef = useRef();
     const [hovered, setHovered] = useState(false);
     const tmpScaleRef = useRef(new THREE.Vector3(1, 1, 1));
+    const haloScaleRef = useRef(new THREE.Vector3(1, 1, 1));
 
     useFrame((state, delta) => {
         if (!meshRef.current) return;
@@ -17,6 +19,14 @@ export const NodeMarker = memo(function NodeMarker({ nodeId, position, label, is
         const s = targetScale * currentScale;
         tmpScaleRef.current.set(s, s, s);
         meshRef.current.scale.lerp(tmpScaleRef.current, delta * 10);
+
+        if (haloRef.current) {
+            const a = isActive ? 1 : 0;
+            const pulse = 1 + (isActive ? Math.sin(t * 4.5) * 0.07 : 0);
+            haloScaleRef.current.set(pulse, 1, pulse);
+            haloRef.current.scale.lerp(haloScaleRef.current, delta * 8);
+            haloRef.current.material.opacity = 0.15 + a * 0.35;
+        }
     });
 
     let color = '#aabcc4';
@@ -34,6 +44,11 @@ export const NodeMarker = memo(function NodeMarker({ nodeId, position, label, is
         emissive = '#3a7dc8';
         emissiveIntensity = 0.7;
         size = 0.24;
+    } else if (isActive) {
+        color = '#fbbf24';
+        emissive = '#fbbf24';
+        emissiveIntensity = 1.1;
+        size = 0.26;
     }
 
     return (
@@ -53,6 +68,11 @@ export const NodeMarker = memo(function NodeMarker({ nodeId, position, label, is
             <mesh ref={meshRef}>
                 <sphereGeometry args={[size, 10, 10]} />
                 <meshStandardMaterial color={color} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+            </mesh>
+
+            <mesh ref={haloRef} rotation={[Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+                <ringGeometry args={[size * 2.2, size * 3.2, 24]} />
+                <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={1.8} transparent opacity={isActive ? 0.5 : 0} />
             </mesh>
 
             {label && (

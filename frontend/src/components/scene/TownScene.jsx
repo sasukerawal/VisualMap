@@ -19,6 +19,20 @@ import { elevationAt, groundHeightAt, TERRAIN_AMP, TERRAIN_BASE_Y } from '../../
 import useStore from '../../store/useStore';
 import { shallow } from 'zustand/shallow';
 
+function InvalidateOnStateChanges() {
+    const invalidate = useThree((s) => s.invalidate);
+    const currentStepIndex = useStore((s) => s.currentStepIndex);
+    const destinationsKey = useStore((s) => (s.destinations || []).join('|'));
+    const exploredSig = useStore((s) => `${(s.exploredNodes || []).length}|${(s.exploredEdges || []).length}`);
+    const routeSig = useStore((s) => (s.routeResult ? `1|${(s.routeResult.edges_traversed || []).length}` : '0'));
+
+    useEffect(() => {
+        invalidate();
+    }, [invalidate, currentStepIndex, destinationsKey, exploredSig, routeSig]);
+
+    return null;
+}
+
 // Block definitions: center [cx, cz] and color theme index
 // Each block is split into Left and Right lots with an alleyway in the middle
 const BLOCKS = [
@@ -275,6 +289,8 @@ export function TownWorld({
         return s;
     }, [stepsResult, currentStepIndex]);
 
+    const activeNodeId = stepsResult?.steps?.[currentStepIndex]?.node || null;
+
     // Group houses by block for index offset
     const housesByBlock = useMemo(() => {
         const map = {};
@@ -369,6 +385,7 @@ export function TownWorld({
                         label={showLabels && !uiOverlayOpen ? displayNodeName(id) : null}
                         isExplored={exploredNodes.includes(id)}
                         isOnPath={finalPath.includes(id)}
+                        isActive={activeNodeId === id}
                     />
                 ))}
 
@@ -381,6 +398,7 @@ export function TownWorld({
                     label={node.label}
                     isSelected={destinations.includes(node.id)}
                     isOnPath={finalPath.includes(node.id)}
+                    isActive={activeNodeId === node.id}
                     showLabel={showLabels && !uiOverlayOpen}
                     uiOverlayOpen={uiOverlayOpen}
                 />
@@ -393,18 +411,29 @@ export function TownWorld({
 }
 
 export function TownScene() {
-    const cameraAngle = useStore((s) => s.cameraAngle);
+    const { cameraAngle, isPlaying, isPaused, isTimelinePlaying } = useStore(
+        (s) => ({
+            cameraAngle: s.cameraAngle,
+            isPlaying: s.isPlaying,
+            isPaused: s.isPaused,
+            isTimelinePlaying: s.isTimelinePlaying,
+        }),
+        shallow
+    );
+    const isAnimating = (isPlaying && !isPaused) || !!isTimelinePlaying;
 
     return (
         <div style={{ width: '100%', height: '100%', background: '#87CEEB' }}>
             <Canvas
                 shadows
+                frameloop={isAnimating ? 'always' : 'demand'}
                 camera={{ fov: 50, position: [-5, 38, 50], near: 0.1, far: 200 }}
                 dpr={[1, 1.5]}
                 gl={{ antialias: true, failIfMajorPerformanceCaveat: false, powerPreference: 'high-performance' }}
             >
                 {/* Dynamically lower DPR on slow frames to keep the UI responsive. */}
                 <AdaptiveDpr pixelated />
+                <InvalidateOnStateChanges />
                 <TownWorld />
             </Canvas>
         </div>

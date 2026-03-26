@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import useStore from '../../store/useStore';
 import { shallow } from 'zustand/shallow';
 import { computePath, computePathSteps } from '../../api/pathfinding';
@@ -188,6 +188,14 @@ export function PlaybackControls() {
         applyExplorationSnapshot(next);
     }
 
+    function isEditableTarget(target) {
+        if (!target) return false;
+        const el = target;
+        if (el.isContentEditable) return true;
+        const tag = (el.tagName || '').toUpperCase();
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    }
+
     function isDecisionAction(action) {
         return action === 'settle' || action === 'relax_round' || action === 'select' || action === 'expand';
     }
@@ -200,6 +208,52 @@ export function PlaybackControls() {
         while (i < steps.length && !isDecisionAction(steps[i]?.action)) i += 1;
         setStep(Math.min(i, steps.length - 1));
     }
+
+    function prevDecision() {
+        const steps = stepsResult?.steps || [];
+        if (!steps.length) return;
+        const start = clampStep((currentStepIndex ?? 0) - 1);
+        let i = start;
+        while (i >= 0 && !isDecisionAction(steps[i]?.action)) i -= 1;
+        setStep(Math.max(i, 0));
+    }
+
+    const togglePause = useCallback(() => {
+        const state = useStore.getState();
+        if (!state.isPlaying) return;
+        state.setIsPaused(!state.isPaused);
+    }, []);
+
+    // Keyboard parity: space=play/pause, arrows=step, shift+arrows=decision-step.
+    useEffect(() => {
+        function onKeyDown(e) {
+            if (isEditableTarget(e.target)) return;
+
+            const state = useStore.getState();
+            const hasSteps = (state.stepsResult?.steps?.length || 0) > 0;
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+                return;
+            }
+
+            if (!hasSteps) return;
+
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                if (e.shiftKey) nextDecision();
+                else setStep((state.currentStepIndex ?? 0) + 1);
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                if (e.shiftKey) prevDecision();
+                else setStep((state.currentStepIndex ?? 0) - 1);
+            }
+        }
+
+        window.addEventListener('keydown', onKeyDown, { passive: false });
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [togglePause, stepsResult, currentStepIndex]);
 
     async function handleStart() {
         if (!destinations.length) return;
@@ -239,7 +293,7 @@ export function PlaybackControls() {
                 (typeof message === 'string' && (message.includes('Network Error') || message.includes('ECONNREFUSED')));
 
             if (maybeProxyDown || maybeBackendDown) {
-                setError("Backend API isn’t reachable. Start it with: `cd backend; uvicorn app.main:app --reload --port 8000`");
+                setError("Backend API isn't reachable. Start it with: `cd backend; uvicorn app.main:app --reload --port 8000`");
             } else {
                 setError(detail || message || 'Failed to compute path');
             }

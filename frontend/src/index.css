@@ -5,6 +5,22 @@
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
+  /* Typography tokens (readability-first, responsive) */
+  --text-xs: clamp(0.72rem, 0.70rem + 0.15vw, 0.80rem); /* labels */
+  --text-sm: clamp(0.84rem, 0.82rem + 0.18vw, 0.95rem); /* secondary */
+  --text-md: clamp(0.98rem, 0.95rem + 0.22vw, 1.08rem); /* body */
+  --text-lg: clamp(1.10rem, 1.05rem + 0.35vw, 1.30rem); /* section title */
+  --text-xl: clamp(1.35rem, 1.25rem + 0.55vw, 1.70rem); /* modal title */
+
+  --lh-tight: 1.2;
+  --lh-body: 1.55;
+  --lh-loose: 1.75;
+
+  --w-regular: 450;
+  --w-medium: 550;
+  --w-bold: 700;
+  --w-black: 800;
+
   /* Light-leaning dark panel */
   --bg-panel: #1f2a3d;
   --bg-card: rgba(255, 255, 255, 0.06);
@@ -45,8 +61,8 @@ body,
     #101827;
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--text-md);
+  line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -83,6 +99,11 @@ button {
 
 button:hover:not(:disabled) {
   transform: translateY(-1px);
+}
+
+button:focus-visible {
+  outline: 2px solid rgba(34, 212, 232, 0.8);
+  outline-offset: 2px;
 }
 
 .btn {
@@ -222,6 +243,40 @@ button:hover:not(:disabled) {
 
 .animate-fade-in {
   animation: fadeInUp 0.3s ease forwards;
+}
+
+/* Panel scroll utilities (sticky header + single scroll region) */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panelHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  backdrop-filter: blur(10px);
+}
+
+.panelScroll {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 6px;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 @keyframes pulse-anim {

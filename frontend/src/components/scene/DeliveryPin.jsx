@@ -10,8 +10,10 @@ import { shallow } from 'zustand/shallow';
 
 const PIN_BASE_Y = 3.2;
 
-export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, isSelected, isOnPath, showLabel, uiOverlayOpen = false, interactive = true }) {
+export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, isSelected, isOnPath, isActive, showLabel, uiOverlayOpen = false, interactive = true }) {
     const meshRef = useRef();
+    const activeRingRef = useRef();
+    const ringScaleRef = useRef({ s: 1 });
     const [hovered, setHovered] = useState(false);
     const { addDestination, removeDestination, isPlaying, deliveredNodes } = useStore(
         (s) => ({
@@ -25,10 +27,18 @@ export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, 
 
     const isDelivered = deliveredNodes.includes(nodeId);
 
-    useFrame((state) => {
+    useFrame((state, delta) => {
         if (!meshRef.current) return;
         const t = state.clock.elapsedTime + position[0] * 0.3;
         meshRef.current.position.y = PIN_BASE_Y + 0.4 + Math.sin(t * 2.2) * 0.1;
+
+        if (activeRingRef.current) {
+            const pulse = 1 + Math.sin(t * 4.2) * 0.07;
+            const target = isActive ? pulse : 1;
+            ringScaleRef.current.s = ringScaleRef.current.s + (target - ringScaleRef.current.s) * Math.min(1, delta * 10);
+            activeRingRef.current.scale.set(ringScaleRef.current.s, ringScaleRef.current.s, ringScaleRef.current.s);
+            activeRingRef.current.material.opacity = isActive ? 0.55 : 0;
+        }
     });
 
     const handleClick = (e) => {
@@ -86,6 +96,11 @@ export const DeliveryPin = memo(function DeliveryPin({ nodeId, position, label, 
                     roughness={0.2}
                     metalness={0.3}
                 />
+            </mesh>
+
+            <mesh ref={activeRingRef} position={[0, PIN_BASE_Y + 0.4, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.55, 0.78, 24]} />
+                <meshStandardMaterial color="#22d4e8" emissive="#22d4e8" emissiveIntensity={2} transparent opacity={0} />
             </mesh>
 
             {isDelivered && (

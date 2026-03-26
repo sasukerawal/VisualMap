@@ -259,6 +259,7 @@ export function LecturePanel() {
     const [compareOpen, setCompareOpen] = useState(false);
     const [compareRun, setCompareRun] = useState(null);
     const [compareLoading, setCompareLoading] = useState(false);
+    const [liveText, setLiveText] = useState('');
 
     const mode = learningMode === 'professor' ? 'professor' : learningMode;
     const metricLabel = algorithm === 'astar' ? 'gFuel' : 'dist';
@@ -278,6 +279,12 @@ export function LecturePanel() {
         setPredictionChoice(null);
         setPredictionRevealed(false);
     }, [currentStepIndex]);
+
+    useEffect(() => {
+        const title = narr?.action_title || `Step ${step?.step ?? currentStepIndex + 1}`;
+        const why = narr?.why ? ` Why: ${narr.why}` : '';
+        setLiveText(`${title}.${why}`.trim());
+    }, [currentStepIndex, narr?.action_title, narr?.why, step?.step]);
 
     async function runCompare() {
         if (!destinations?.length) return;
@@ -321,10 +328,13 @@ export function LecturePanel() {
 
     return (
         <div className="card" style={{ borderRadius: 16, padding: 0, overflow: 'hidden' }} aria-label="Lecture panel">
+            <div className="sr-only" aria-live="polite" aria-atomic="true">
+                {liveText}
+            </div>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(148,163,184,0.10)', background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9fc7ff' }}>
-                        Lecture • {mode}
+                        Lecture - {mode}
                     </div>
                     <div style={{ marginTop: 4, fontSize: 12, fontWeight: 900, color: '#eef2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {narr?.action_title || `Step ${step?.step ?? currentStepIndex + 1}`}
@@ -337,7 +347,7 @@ export function LecturePanel() {
                         )}
                         {optimization?.metric && optimization?.queue_key && (
                             <span style={{ fontSize: 10, color: '#9fb0ca', lineHeight: 1.4 }}>
-                                <strong style={{ color: '#eef2ff' }}>Optimizing:</strong> {optimization.metric} • <strong style={{ color: '#eef2ff' }}>Key:</strong> {optimization.queue_key}
+                                <strong style={{ color: '#eef2ff' }}>Optimizing:</strong> {optimization.metric} - <strong style={{ color: '#eef2ff' }}>Key:</strong> {optimization.queue_key}
                             </span>
                         )}
                     </div>
@@ -374,7 +384,7 @@ export function LecturePanel() {
                     )}
 
                     <div style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.6 }}>
-                        <strong style={{ color: '#eef2ff' }}>Why:</strong> {narr?.why || '—'}
+                        <strong style={{ color: '#eef2ff' }}>Why:</strong> {narr?.why || '-'}
                     </div>
 
                     {(mode === 'intermediate' || mode === 'advanced' || mode === 'professor') && predictionOptions.length > 1 && (
@@ -414,13 +424,13 @@ export function LecturePanel() {
                                 <div style={{ marginTop: 10, fontSize: 11, color: '#9fb0ca', lineHeight: 1.55 }}>
                                     Likely next: <strong style={{ color: '#eef2ff' }}>{displayNodeName(predictionOptions[0])}</strong>
                                     {predictionChoice ? (
-                                        <>
-                                            {' '}• You chose{' '}
-                                            <strong style={{ color: '#eef2ff' }}>{displayNodeName(predictionChoice)}</strong>
-                                        </>
-                                    ) : null}
-                                </div>
-                            )}
+                                            <>
+                                                {' '} - You chose{' '}
+                                                <strong style={{ color: '#eef2ff' }}>{displayNodeName(predictionChoice)}</strong>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                )}
                         </div>
                     )}
 

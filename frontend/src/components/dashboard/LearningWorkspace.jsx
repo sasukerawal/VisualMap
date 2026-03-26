@@ -127,8 +127,8 @@ export function LearningWorkspace() {
                             style={{
                                 flex: 1,
                                 padding: '4px 0',
-                                fontSize: '9px',
-                                fontWeight: 700,
+                                fontSize: 'var(--text-xs)',
+                                fontWeight: 800,
                                 textTransform: 'capitalize',
                                 border: 'none',
                                 borderRadius: 4,
@@ -179,13 +179,13 @@ export function LearningWorkspace() {
                             {/* Tab Nav */}
                             <div style={{ display: 'flex', padding: '8px 16px 0', gap: '3px', borderBottom: '1px solid rgba(99,120,255,0.12)', flexShrink: 0 }}>
                                 {TABS.map((tab) => (
-                                    <button
+                            <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
                                         style={{
                                             padding: '8px 14px',
-                                            fontSize: '10px',
-                                            fontWeight: 700,
+                                            fontSize: 'var(--text-xs)',
+                                            fontWeight: 800,
                                             textTransform: 'uppercase',
                                             letterSpacing: '0.3px',
                                             fontFamily: 'var(--font-sans)',

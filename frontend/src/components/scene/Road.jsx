@@ -3,13 +3,15 @@
  * Shows direction arrows for one-way roads.
  * Brighter color scheme to match lighter overall theme.
  */
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, useRef } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
 import { groundHeightAt } from '../../data/elevation';
+import { useFrame } from '@react-three/fiber';
 
 export const Road = memo(function Road({ from, to, oneWay = false, isExplored, isFinal, isActiveRelaxed, isDriveway = false, roadType, speedLimit, uiOverlayOpen = false }) {
     const [hovered, setHovered] = useState(false);
+    const relaxMatRef = useRef();
     if (!from || !to) return null;
 
     // Keep a single surface offset for ALL road types so segments meet cleanly at intersections.
@@ -52,6 +54,16 @@ export const Road = memo(function Road({ from, to, oneWay = false, isExplored, i
     // Calculate transit time for display
     const transitTime = (planarLength / (speedLimit || 1)).toFixed(1);
 
+    useFrame((state) => {
+        if (!relaxMatRef.current) return;
+        if (!isActiveRelaxed) {
+            relaxMatRef.current.opacity = 0;
+            return;
+        }
+        const t = state.clock.elapsedTime + planarLength * 0.03;
+        relaxMatRef.current.opacity = 0.35 + Math.sin(t * 6) * 0.18;
+    });
+
     return (
         <group
             position={position}
@@ -70,6 +82,7 @@ export const Road = memo(function Road({ from, to, oneWay = false, isExplored, i
                 <mesh position={[0, 0.05, 0]}>
                     <boxGeometry args={[roadWidth * 0.9, 0.08, length * 1.02]} />
                     <meshStandardMaterial
+                        ref={relaxMatRef}
                         color="#fbbf24"
                         emissive="#fbbf24"
                         emissiveIntensity={2}
@@ -100,10 +113,10 @@ export const Road = memo(function Road({ from, to, oneWay = false, isExplored, i
                         gap: 2,
                         transform: 'translateY(-10px)'
                     }}>
-                        <div style={{ opacity: 0.6, fontSize: '7px', textTransform: 'uppercase' }}>{isActiveRelaxed ? "Analyzing Edge..." : "Road Data"}</div>
+                        <div style={{ opacity: 0.6, fontSize: '7px', textTransform: 'uppercase' }}>{isActiveRelaxed ? "Analyzing edge..." : "Road data"}</div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span>⚡ {speedLimit}km/h</span>
-                            <span style={{ color: '#818cf8' }}>⏱️ {transitTime}s</span>
+                            <span>Speed {speedLimit}km/h</span>
+                            <span style={{ color: '#818cf8' }}>Time {transitTime}s</span>
                         </div>
                     </div>
                 </Html>
