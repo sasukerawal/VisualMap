@@ -142,7 +142,7 @@ function ZoneOverlay() {
     );
 }
 
-function DecisionSidebar({ stepsResult, currentStepIndex, routeResult, currentSegment }) {
+function DecisionSidebar({ algorithm, stepsResult, currentStepIndex, routeResult, currentSegment }) {
     const step = stepsResult?.steps?.[currentStepIndex] || null;
     const narr = step?.narration || null;
     const nodeLabel = step?.node ? displayNodeName(step.node) : '-';
@@ -153,10 +153,135 @@ function DecisionSidebar({ stepsResult, currentStepIndex, routeResult, currentSe
     const updated = comparisons.filter((c) => c?.updated);
     const noChange = comparisons.filter((c) => c && !c.updated);
     const [showAllComparisons, setShowAllComparisons] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
+    const [sidebarView, setSidebarView] = useState('slides'); // 'slides' | 'full'
+    const overlayLockRef = useRef(false);
+
+    useEffect(() => {
+        // Ensure 3D Html labels don't bleed through any fixed-position modal.
+        if (showDetails && !overlayLockRef.current) {
+            useStore.getState().pushUiOverlayLock();
+            overlayLockRef.current = true;
+        }
+        if (!showDetails && overlayLockRef.current) {
+            useStore.getState().popUiOverlayLock();
+            overlayLockRef.current = false;
+        }
+        return () => {
+            if (overlayLockRef.current) {
+                useStore.getState().popUiOverlayLock();
+                overlayLockRef.current = false;
+            }
+            // Also clear hover highlight if we unmount while hovering.
+            useStore.getState().setHoveredEdgeKey(null);
+        };
+    }, [showDetails]);
 
     const seg = routeResult?.segments?.[currentSegment] || null;
     const segFrom = seg?.from ? displayNodeName(seg.from) : null;
     const segTo = seg?.to ? displayNodeName(seg.to) : null;
+
+    const compactUpdates = updated.slice(0, 4);
+    const compactNoChange = noChange.slice(0, 2);
+
+    const prediction = useMemo(() => {
+        const s = narr?.state_after || null;
+        if (!s) return null;
+
+        if (typeof s.pass_num === 'number') {
+            if ((s.updates_in_step ?? 0) === 0) {
+                return 'Prediction: No distances changed in this pass. Bellman-Ford can stop early because another pass would produce the same result.';
+            }
+            return `Prediction: At least one distance improved in pass ${s.pass_num}. The algorithm will proceed to pass ${s.pass_num + 1} (unless a future pass makes no changes).`;
+        }
+
+        const frontier = Array.isArray(s.unsettled_frontier) ? s.unsettled_frontier : null;
+        if (frontier?.length) {
+            const next = frontier[0];
+            const name = next?.node ? displayNodeName(next.node) : 'the next vertex';
+            const key = next?.key != null ? String(next.key) : '?';
+            return `Prediction: Next, the algorithm will likely choose ${name} because it has the smallest key value in the frontier (${key}).`;
+        }
+
+        const openSet = Array.isArray(s.open_set) ? s.open_set : null;
+        if (openSet?.length) {
+            const next = openSet[0];
+            const name = next?.node ? displayNodeName(next.node) : 'the next node';
+            const key = next?.key != null ? String(next.key) : '?';
+            return `Prediction: Next, A* will likely choose ${name} because it has the smallest f(n) in the open set (${key}).`;
+        }
+
+        return null;
+    }, [narr?.state_after]);
+
+    const metricName = algorithm === 'astar' ? 'gFuel' : 'dist';
+    const metricUnit = algorithm === 'astar' ? '' : 's';
+
+    function ComparisonRow({ c, accent }) {
+        const edge = c?.edge || null;
+        const from = edge?.from ? displayNodeName(edge.from) : null;
+        const to = edge?.to ? displayNodeName(edge.to) : (c?.node ? displayNodeName(c.node) : null);
+        const edgeName = from && to ? `${from} → ${to}` : (to || '-');
+        const wTime = edge?.time_cost != null ? `${edge.time_cost}s` : null;
+        const wDist = edge?.physical_distance != null ? `${edge.physical_distance}m` : null;
+        const wFuel = edge?.fuel_cost != null ? `${edge.fuel_cost} fuel` : null;
+        const slope = edge?.elev_delta != null ? `Δelev=${edge.elev_delta}` : null;
+        const metrics = [wTime, wDist, wFuel, slope].filter(Boolean).join(' · ');
+        const oldVal = (algorithm === 'astar' ? c?.old_fuel : c?.old_value) ?? '—';
+        const candVal = (algorithm === 'astar' ? c?.candidate_fuel : c?.candidate_value) ?? '—';
+        const newVal = (algorithm === 'astar' ? c?.new_fuel : c?.new_value) ?? '—';
+        const parentLine = (c?.new_parent || c?.old_parent) ? `parent: ${c?.old_parent ?? '—'} → ${c?.new_parent ?? c?.old_parent ?? '—'}` : null;
+        const hoverKey = edge?.from && edge?.to ? `${edge.from}-${edge.to}` : null;
+        return (
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    padding: '10px 10px',
+                    borderRadius: 12,
+                    border: `1px solid rgba(148,163,184,0.14)`,
+                    background: 'rgba(255,255,255,0.02)',
+                }}
+                onMouseEnter={() => {
+                    if (hoverKey) useStore.getState().setHoveredEdgeKey(hoverKey);
+                }}
+                onMouseLeave={() => {
+                    if (hoverKey) useStore.getState().setHoveredEdgeKey(null);
+                }}
+            >
+                <div style={{ width: 10, height: 10, borderRadius: 999, background: accent, boxShadow: `0 0 12px ${accent}`, flexShrink: 0, marginTop: 3 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 900, color: '#eef2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {edgeName}
+                    </div>
+                    {metrics ? (
+                        <div style={{ fontSize: '10px', color: '#9fb0ca', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                            w = {metrics}
+                        </div>
+                    ) : null}
+                    <div style={{ fontSize: '10px', color: '#b7c7e6', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+                        {metricName}: old {String(oldVal)}{metricUnit} · candidate {String(candVal)}{metricUnit} · new {String(newVal)}{metricUnit}
+                    </div>
+                    {typeof c?.candidate_g !== 'undefined' || typeof c?.h !== 'undefined' ? (
+                        <div style={{ fontSize: '10px', color: '#9fb0ca', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+                            g: {String(c?.candidate_g ?? '—')} · h: {String(c?.h ?? '—')} · f: {String(c?.candidate_f ?? '—')}
+                        </div>
+                    ) : null}
+                    {parentLine ? (
+                        <div style={{ fontSize: '10px', color: '#93a6c3', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+                            {parentLine}
+                        </div>
+                    ) : null}
+                    {c?.note ? (
+                        <div style={{ fontSize: '10px', color: '#93a6c3', marginTop: 4, lineHeight: 1.35 }}>
+                            {String(c.note)}
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -177,6 +302,35 @@ function DecisionSidebar({ stepsResult, currentStepIndex, routeResult, currentSe
                 maxWidth: 640,
             }}
         >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                    Professor Mode
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    {[
+                        { id: 'slides', label: 'Slides' },
+                        { id: 'full', label: 'Full' },
+                    ].map((opt) => (
+                        <button
+                            key={opt.id}
+                            onClick={() => setSidebarView(opt.id)}
+                            style={{
+                                padding: '6px 10px',
+                                borderRadius: 999,
+                                border: `1px solid ${sidebarView === opt.id ? 'rgba(34,211,238,0.30)' : 'rgba(148,163,184,0.16)'}`,
+                                background: sidebarView === opt.id ? 'rgba(34,211,238,0.10)' : 'rgba(255,255,255,0.03)',
+                                color: sidebarView === opt.id ? '#d6f9ff' : '#93a6c3',
+                                fontSize: 11,
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                            }}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             <div>
                 <div style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '0.08em', color: '#9fb0ca', textTransform: 'uppercase' }}>
                     Current Step
@@ -209,6 +363,76 @@ function DecisionSidebar({ stepsResult, currentStepIndex, routeResult, currentSe
                         Start the simulation to see step-by-step decisions.
                     </div>
                 )}
+
+                {sidebarView === 'slides' && comparisons.length ? (
+                    <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <button
+                            onClick={() => setShowDetails(true)}
+                            style={{
+                                padding: '10px 12px',
+                                borderRadius: 14,
+                                border: '1px solid rgba(34,211,238,0.22)',
+                                background: 'linear-gradient(135deg, rgba(34,211,238,0.14), rgba(91,156,246,0.10))',
+                                color: '#d6f9ff',
+                                fontWeight: 950,
+                                fontSize: 12,
+                                cursor: 'pointer',
+                                flex: 1,
+                                minWidth: 160,
+                            }}
+                        >
+                            Open Step Details
+                        </button>
+                        <div style={{ padding: '10px 12px', borderRadius: 14, border: '1px solid rgba(148,163,184,0.14)', background: 'rgba(255,255,255,0.02)', color: '#9fb0ca', fontWeight: 800, fontSize: 11 }}>
+                            {updated.length} update(s) · {noChange.length} no-update
+                        </div>
+                    </div>
+                ) : null}
+
+                {prediction ? (
+                    <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 14, border: '1px solid rgba(148,163,184,0.14)', background: 'rgba(255,255,255,0.02)' }}>
+                        <div style={{ fontSize: 10, fontWeight: 950, color: '#9fb0ca', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                            Prediction
+                        </div>
+                        <div style={{ marginTop: 8, fontSize: 12, color: '#cbd5e1', lineHeight: 1.6 }}>
+                            {prediction}
+                        </div>
+                    </div>
+                ) : null}
+
+                {/* Evidence widget: show the top of the frontier/open-set to “prove” the next choice. */}
+                {sidebarView === 'slides' && narr?.state_after ? (
+                    <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 14, border: '1px solid rgba(148,163,184,0.14)', background: 'rgba(255,255,255,0.02)' }}>
+                        <div style={{ fontSize: 10, fontWeight: 950, color: '#9fb0ca', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                            Evidence (Top-k Ordering)
+                        </div>
+                        {Array.isArray(narr.state_after.unsettled_frontier) && narr.state_after.unsettled_frontier.length ? (
+                            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, fontFamily: 'var(--font-mono)' }}>
+                                {narr.state_after.unsettled_frontier.slice(0, 6).map((it) => (
+                                    <div key={it.node} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 11, color: '#b7c7e6' }}>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayNodeName(it.node)}</span>
+                                        <span style={{ color: '#93a6c3' }}>{String(it.key)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+                        {Array.isArray(narr.state_after.open_set) && narr.state_after.open_set.length ? (
+                            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, fontFamily: 'var(--font-mono)' }}>
+                                {narr.state_after.open_set.slice(0, 6).map((it) => (
+                                    <div key={it.node} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 11, color: '#b7c7e6' }}>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayNodeName(it.node)}</span>
+                                        <span style={{ color: '#93a6c3' }}>{String(it.key)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+                        {typeof narr.state_after.pass_num === 'number' ? (
+                            <div style={{ marginTop: 8, fontSize: 11, color: '#93a6c3', fontFamily: 'var(--font-mono)' }}>
+                                pass: {narr.state_after.pass_num} / {narr.state_after.passes_total ?? '—'} · updates: {narr.state_after.updates_in_step ?? '—'}
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
             </div>
 
             <div style={{ height: 1, background: 'rgba(148,163,184,0.14)' }} />
@@ -217,75 +441,40 @@ function DecisionSidebar({ stepsResult, currentStepIndex, routeResult, currentSe
                 <div style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '0.08em', color: '#9fb0ca', textTransform: 'uppercase' }}>
                     Step Comparisons
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', paddingRight: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', paddingRight: 6 }}>
                     {comparisons.length ? (
                         <>
-                            {[{ label: 'Updates (Relaxations That Improved a Value)', items: updated, color: '#22c55e' },
-                              { label: 'No Update (Candidate Was Not Better)', items: noChange, color: '#f97316' }].map((group) => (
+                            {sidebarView === 'slides' ? (
+                                <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <div style={{ fontSize: '10px', fontWeight: 950, color: '#cbd5e1', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                            Key Updates (Relaxations)
+                                        </div>
+                                        {compactUpdates.length ? compactUpdates.map((c, i) => <ComparisonRow key={`u-${i}`} c={c} accent="#22c55e" />) : (
+                                            <div style={{ fontSize: '12px', color: '#7a8aaa' }}>No updates in this step.</div>
+                                        )}
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <div style={{ fontSize: '10px', fontWeight: 950, color: '#cbd5e1', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                            Key No-update Comparisons (No Improvement)
+                                        </div>
+                                        {compactNoChange.length ? compactNoChange.map((c, i) => <ComparisonRow key={`n-${i}`} c={c} accent="#f97316" />) : (
+                                            <div style={{ fontSize: '12px', color: '#7a8aaa' }}>No no-update comparisons recorded.</div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : null}
+
+                            {sidebarView !== 'slides' ? (
+                                [{ label: 'Updates (Relaxations That Improved a Value)', items: updated, color: '#22c55e' },
+                                  { label: 'No Update (Candidate Was Not Better)', items: noChange, color: '#f97316' }].map((group) => (
                                 <div key={group.label} style={{ marginBottom: 10 }}>
                                     <div style={{ fontSize: '10px', fontWeight: 950, color: '#cbd5e1', letterSpacing: '0.08em', textTransform: 'uppercase', margin: '8px 0 6px' }}>
                                         {group.label}
                                     </div>
-                                    {group.items.length ? (showAllComparisons ? group.items : group.items.slice(0, 10)).map((c, i) => {
-                                        const edge = c?.edge || null;
-                                        const from = edge?.from ? displayNodeName(edge.from) : null;
-                                        const to = edge?.to ? displayNodeName(edge.to) : (c?.node ? displayNodeName(c.node) : null);
-                                        const edgeName = from && to ? `${from} → ${to}` : (to || '-');
-                                        const wTime = edge?.time_cost != null ? `${edge.time_cost}s` : null;
-                                        const wDist = edge?.physical_distance != null ? `${edge.physical_distance}m` : null;
-                                        const wFuel = edge?.fuel_cost != null ? `${edge.fuel_cost} fuel` : null;
-                                        const slope = edge?.elev_delta != null ? `Δelev=${edge.elev_delta}` : null;
-                                        const metrics = [wTime, wDist, wFuel, slope].filter(Boolean).join(' · ');
-                                        const oldVal = c?.old_value ?? '—';
-                                        const candVal = c?.candidate_value ?? '—';
-                                        const newVal = c?.new_value ?? '—';
-                                        const parentLine = (c?.new_parent || c?.old_parent) ? `parent: ${c?.old_parent ?? '—'} → ${c?.new_parent ?? c?.old_parent ?? '—'}` : null;
-
-                                        return (
-                                            <div
-                                                key={`${group.label}-${edgeName}-${i}`}
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'flex-start',
-                                                    gap: 10,
-                                                    padding: '10px 10px',
-                                                    borderRadius: 12,
-                                                    border: `1px solid ${c.updated ? 'rgba(34,197,94,0.22)' : 'rgba(249,115,22,0.22)'}`,
-                                                    background: c.updated ? 'rgba(34,197,94,0.06)' : 'rgba(249,115,22,0.06)',
-                                                }}
-                                            >
-                                                <div style={{ width: 10, height: 10, borderRadius: 999, background: group.color, boxShadow: `0 0 12px ${group.color}`, flexShrink: 0, marginTop: 3 }} />
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div style={{ fontSize: '12px', fontWeight: 900, color: '#eef2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        {edgeName}
-                                                    </div>
-                                                    {metrics ? (
-                                                        <div style={{ fontSize: '10px', color: '#9fb0ca', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
-                                                            w = {metrics}
-                                                        </div>
-                                                    ) : null}
-                                                    <div style={{ fontSize: '10px', color: '#b7c7e6', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
-                                                        old: {String(oldVal)} · candidate: {String(candVal)} · new: {String(newVal)}
-                                                    </div>
-                                                    {typeof c?.candidate_g !== 'undefined' || typeof c?.h !== 'undefined' ? (
-                                                        <div style={{ fontSize: '10px', color: '#9fb0ca', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
-                                                            g: {String(c?.candidate_g ?? '—')} · h: {String(c?.h ?? '—')} · f: {String(c?.candidate_f ?? '—')}
-                                                        </div>
-                                                    ) : null}
-                                                    {parentLine ? (
-                                                        <div style={{ fontSize: '10px', color: '#93a6c3', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
-                                                            {parentLine}
-                                                        </div>
-                                                    ) : null}
-                                                    {c?.note ? (
-                                                        <div style={{ fontSize: '10px', color: '#93a6c3', marginTop: 4, lineHeight: 1.35 }}>
-                                                            {String(c.note)}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            </div>
-                                        );
-                                    }) : (
+                                    {group.items.length ? (showAllComparisons ? group.items : group.items.slice(0, 10)).map((c, i) => (
+                                        <ComparisonRow key={`${group.label}-${i}`} c={c} accent={group.color} />
+                                    )) : (
                                         <div style={{ fontSize: '12px', color: '#7a8aaa' }}>None in this step.</div>
                                     )}
                                     {!showAllComparisons && group.items.length > 10 ? (
@@ -308,7 +497,7 @@ function DecisionSidebar({ stepsResult, currentStepIndex, routeResult, currentSe
                                         </button>
                                     ) : null}
                                 </div>
-                            ))}
+                            ))) : null}
                             {showAllComparisons ? (
                                 <button
                                     onClick={() => setShowAllComparisons(false)}
@@ -379,7 +568,7 @@ function DecisionSidebar({ stepsResult, currentStepIndex, routeResult, currentSe
                                     {narr.state_after.dist_preview ? (
                                         <div>
                                             <div style={{ fontSize: '9px', fontWeight: 900, color: '#9fb0ca', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-                                                dist[] / parent[] preview
+                                                {algorithm === 'astar' ? 'gFuel[] preview (cost so far)' : 'dist[] preview (tentative distance)'}
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontFamily: 'var(--font-mono)' }}>
                                                 {Object.entries(narr.state_after.dist_preview).slice(0, 10).map(([id, val]) => (
@@ -399,6 +588,94 @@ function DecisionSidebar({ stepsResult, currentStepIndex, routeResult, currentSe
                     )}
                 </div>
             </div>
+
+            {showDetails ? (
+                <div
+                    onClick={() => setShowDetails(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 2000,
+                        background: 'rgba(0,0,0,0.55)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 18,
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: 'min(980px, 96vw)',
+                            maxHeight: 'min(780px, 92vh)',
+                            overflow: 'hidden',
+                            borderRadius: 18,
+                            border: '1px solid rgba(148,163,184,0.16)',
+                            background: 'linear-gradient(180deg, rgba(10,15,25,0.98), rgba(7,10,18,0.96))',
+                            boxShadow: '0 30px 120px rgba(0,0,0,0.55)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                        }}
+                    >
+                        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderBottom: '1px solid rgba(148,163,184,0.14)' }}>
+                            <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9fb0ca' }}>
+                                    Step Details
+                                </div>
+                                <div style={{ marginTop: 6, fontSize: 14, fontWeight: 950, color: '#eef2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {actionTitle}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowDetails(false)}
+                                style={{
+                                    padding: '8px 10px',
+                                    borderRadius: 12,
+                                    border: '1px solid rgba(248,113,113,0.22)',
+                                    background: 'rgba(248,113,113,0.10)',
+                                    color: '#fca5a5',
+                                    fontWeight: 950,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <div style={{ padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {why ? (
+                                <div style={{ padding: 12, borderRadius: 14, border: '1px solid rgba(34,211,238,0.18)', background: 'rgba(34,211,238,0.08)', color: '#d6f9ff', lineHeight: 1.7 }}>
+                                    {String(why)}
+                                </div>
+                            ) : null}
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <div style={{ fontSize: 10, fontWeight: 950, color: '#cbd5e1', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                        Updates
+                                    </div>
+                                    {updated.length ? updated.map((c, i) => <ComparisonRow key={`du-${i}`} c={c} accent="#22c55e" />) : <div style={{ fontSize: 12, color: '#7a8aaa' }}>None.</div>}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <div style={{ fontSize: 10, fontWeight: 950, color: '#cbd5e1', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                        No-update Comparisons
+                                    </div>
+                                    {noChange.length ? noChange.map((c, i) => <ComparisonRow key={`dn-${i}`} c={c} accent="#f97316" />) : <div style={{ fontSize: 12, color: '#7a8aaa' }}>None.</div>}
+                                </div>
+                            </div>
+
+                            {narr?.summary ? (
+                                <div style={{ padding: 12, borderRadius: 14, border: '1px solid rgba(148,163,184,0.14)', background: 'rgba(255,255,255,0.03)', color: '#dbeafe', lineHeight: 1.65 }}>
+                                    <div style={{ fontSize: 10, fontWeight: 950, color: '#9fb0ca', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
+                                        End of Step Summary
+                                    </div>
+                                    {String(narr.summary)}
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -468,10 +745,10 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
         if (isExpanded || dashboardMode) {
             setPreviousLabelState(showLabels);
             setShowLabels(false);
-            useStore.getState().setUiOverlayOpen(true);
+            useStore.getState().pushUiOverlayLock();
         } else {
             setShowLabels(previousLabelState);
-            useStore.getState().setUiOverlayOpen(false);
+            useStore.getState().popUiOverlayLock();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isExpanded, dashboardMode]);
@@ -481,7 +758,13 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
 
     const searchProgress = useMemo(() => {
         if (!hasSteps) return 'Ready (start navigation)';
-        return `Consideration ${currentStepIndex + 1} / ${stepsResult.steps.length}`;
+        const step = stepsResult?.steps?.[currentStepIndex] || null;
+        const passNum = step?.narration?.state_after?.pass_num;
+        const passTotal = step?.narration?.state_after?.passes_total;
+        if (algorithm === 'bellman_ford' && typeof passNum === 'number') {
+            return `Pass ${passNum} / ${passTotal ?? stepsResult.steps.length}`;
+        }
+        return `Step ${currentStepIndex + 1} / ${stepsResult.steps.length}`;
     }, [hasSteps, currentStepIndex, stepsResult]);
 
     if (dashboardMode) {
@@ -675,8 +958,8 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
                         </div>
 
                         <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-                            <DecisionSidebar stepsResult={stepsResult} currentStepIndex={currentStepIndex} routeResult={routeResult} currentSegment={currentSegment} />
-                            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+                        <DecisionSidebar algorithm={algorithm} stepsResult={stepsResult} currentStepIndex={currentStepIndex} routeResult={routeResult} currentSegment={currentSegment} />
+                        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
                                 <TopographyMap2DCanvas
                                     selectedOnly
                                     onReadyApi={(api) => {
@@ -697,7 +980,16 @@ export function StateSpaceExplorer({ expanded = false, onClose, internalHeader =
                                         Algorithm Progress
                                     </div>
                                     <div style={{ fontSize: '12px', fontWeight: 800, color: '#eef2ff' }}>
-                                        {hasSteps ? `Consideration ${currentStepIndex + 1} / ${stepsResult.steps.length}` : 'Ready'}
+                                        {(() => {
+                                            if (!hasSteps) return 'Ready';
+                                            const step = stepsResult?.steps?.[currentStepIndex] || null;
+                                            const passNum = step?.narration?.state_after?.pass_num;
+                                            const passTotal = step?.narration?.state_after?.passes_total;
+                                            if (algorithm === 'bellman_ford' && typeof passNum === 'number') {
+                                                return `Pass ${passNum} / ${passTotal ?? stepsResult.steps.length}`;
+                                            }
+                                            return `Step ${currentStepIndex + 1} / ${stepsResult.steps.length}`;
+                                        })()}
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

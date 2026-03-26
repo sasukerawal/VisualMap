@@ -65,6 +65,8 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
         isTimelinePlaying,
         isTimelinePaused,
         animationSpeed,
+        hoveredEdgeKey,
+        algorithm,
     } = useStore(
         (s) => ({
             destinations: s.destinations,
@@ -76,6 +78,8 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
             isTimelinePlaying: s.isTimelinePlaying,
             isTimelinePaused: s.isTimelinePaused,
             animationSpeed: s.animationSpeed,
+            hoveredEdgeKey: s.hoveredEdgeKey,
+            algorithm: s.algorithm,
         }),
         shallow
     );
@@ -138,6 +142,12 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
     }, [exploredEdges]);
 
     const step = stepsResult?.steps?.[currentStepIndex] || null;
+    const stepNarr = step?.narration || null;
+    const stepComparisons = useMemo(() => {
+        const comps = Array.isArray(stepNarr?.comparisons) ? stepNarr.comparisons : null;
+        if (!comps?.length) return null;
+        return comps.filter((c) => c?.edge?.from && c?.edge?.to);
+    }, [stepNarr]);
     const activeRelaxed = useMemo(() => {
         const s = new Set();
         if (step?.node && Array.isArray(step.neighbors_updated)) {
@@ -150,6 +160,31 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
         }
         return s;
     }, [step?.node, step?.neighbors_updated]);
+
+    const stepCheckedEdges = useMemo(() => {
+        const s = new Set();
+        if (!stepComparisons) return s;
+        for (const c of stepComparisons) {
+            const u = c.edge.from;
+            const v = c.edge.to;
+            s.add(`${u}-${v}`);
+            s.add(`${v}-${u}`);
+        }
+        return s;
+    }, [stepComparisons]);
+
+    const stepUpdatedEdges = useMemo(() => {
+        const s = new Set();
+        if (!stepComparisons) return s;
+        for (const c of stepComparisons) {
+            if (!c.updated) continue;
+            const u = c.edge.from;
+            const v = c.edge.to;
+            s.add(`${u}-${v}`);
+            s.add(`${v}-${u}`);
+        }
+        return s;
+    }, [stepComparisons]);
 
     const edgeSet = useMemo(() => {
         const s = new Set();
@@ -332,6 +367,11 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
             // Suppress "explored" and "active relaxed" highlighting here to avoid clutter.
             const isExplored = autoPauseAtNodes ? false : exploredSet.has(key);
             const isActive = autoPauseAtNodes ? false : activeRelaxed.has(key);
+            // Bellman-Ford checks every edge; avoid flooding the map with orange lines.
+            const tooManyChecks = algorithm === 'bellman_ford' && stepComparisons && stepComparisons.length > 80;
+            const isChecked = autoPauseAtNodes ? false : (!tooManyChecks && stepCheckedEdges.has(key));
+            const isUpdated = autoPauseAtNodes ? false : stepUpdatedEdges.has(key);
+            const isHover = hoveredEdgeKey ? hoveredEdgeKey === key : false;
             const isMain = e.road_type === 'main';
             const isAlley = e.road_type === 'alley';
 
@@ -342,8 +382,11 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
             let width = isMain ? 7 : isAlley ? 4.5 : 5.5;
 
             if (isFinal) { stroke = 'rgba(59,130,246,1)'; width = 9; }
+            else if (isUpdated) { stroke = 'rgba(34,197,94,0.95)'; width = 8; }
+            else if (isChecked) { stroke = 'rgba(249,115,22,0.9)'; width = 7.2; }
             else if (isActive) { stroke = 'rgba(251,191,36,1)'; width = 7.5; }
             else if (isExplored) { stroke = 'rgba(99,102,241,0.85)'; width = 7; }
+            if (isHover) { stroke = 'rgba(34,211,238,1)'; width = 10; }
 
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -363,7 +406,7 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
             ctx.stroke();
 
             // Center dash for non-alley roads if not highlighted.
-            if (!isFinal && !isActive && !isExplored && !isAlley) {
+            if (!isFinal && !isActive && !isExplored && !isChecked && !isUpdated && !isHover && !isAlley) {
                 ctx.strokeStyle = 'rgba(251,191,36,0.55)';
                 ctx.lineWidth = Math.max(1.5, width * 0.2);
                 niceDash(ctx, 10);
@@ -376,18 +419,21 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
         }
 
         // Neighbor options from the current step (edges + nodes).
-        if (step?.node && Array.isArray(step.neighbors_updated)) {
+        // Prefer narration comparisons (includes updates + no-updates) for teaching clarity.
+        const optionComps = stepComparisons;
+        if (step?.node && optionComps?.length) {
             const u = NODES[step.node];
             if (u) {
                 const [ux, uy] = worldToScreen(u.pos[0], u.pos[2]);
 
-                for (const nb of step.neighbors_updated) {
-                    const v = nb?.node ? NODES[nb.node] : null;
+                for (const c of optionComps) {
+                    if (c.edge.from !== step.node) continue;
+                    const v = c?.edge?.to ? NODES[c.edge.to] : null;
                     if (!v) continue;
-                    const relaxed = !!nb.relaxed;
+                    const relaxed = !!c.updated;
                     const [vx, vy] = worldToScreen(v.pos[0], v.pos[2]);
 
-                    // Option edge: green if relaxed, orange if rejected.
+                    // Option edge: green if updated, orange if no-update.
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     clearDash(ctx);
@@ -532,6 +578,9 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
         exploredSet,
         finalEdgeSet,
         activeRelaxed,
+        stepComparisons,
+        stepCheckedEdges,
+        stepUpdatedEdges,
         routeResult,
         step,
         isTimelinePlaying,
@@ -541,6 +590,8 @@ export const TopographyMap2DCanvas = memo(function TopographyMap2DCanvas({
         currentStepIndex,
         stepsResult,
         edgeSet,
+        hoveredEdgeKey,
+        algorithm,
     ]);
 
     const tick = useCallback((tNow) => {

@@ -30,3 +30,6 @@ Thumbs.db
 # Env
 .env
 .env.*
+
+# UI review artifacts
+ui-snapshots/

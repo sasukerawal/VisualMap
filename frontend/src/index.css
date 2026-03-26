@@ -322,8 +322,25 @@ button:hover:not(:disabled) {
 }
 
 @media (max-width: 960px) {
+  .vm-root-panels {
+    flex-direction: column !important;
+  }
+
+  /* Convert the horizontal handle into a vertical-stack handle on narrow screens */
+  .resize-handle-horizontal {
+    width: 100% !important;
+    height: 6px !important;
+    cursor: row-resize;
+  }
+
   .resize-handle-horizontal::after {
-    height: 22px;
+    width: 22px;
+    height: 2px;
+  }
+
+  .vm-dashboard-shell {
+    border-left: none !important;
+    border-top: 1px solid rgba(140, 170, 220, 0.18) !important;
   }
 
   .resize-handle-vertical::after {

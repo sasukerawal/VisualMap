@@ -40,6 +40,13 @@ const useStore = create((set, get) => ({
     setStepsResult: (s) => set({ stepsResult: s }),
     clearResults: () => set({ routeResult: null, stepsResult: null }),
 
+    // ── Tutor (LLM overlay) ────────────────────────────────────────────────
+    tutorOpen: false,
+    setTutorOpen: (open) => set({ tutorOpen: !!open }),
+    tutorHistory: [], // [{ role: 'user'|'assistant', content }]
+    tutorAddMessage: (m) => set((state) => ({ tutorHistory: [...(state.tutorHistory || []), m] })),
+    tutorClear: () => set({ tutorHistory: [] }),
+
     // ── Animation State ───────────────────────────────────────────────────
     isPlaying: false,
     isPaused: false,
@@ -66,11 +73,15 @@ const useStore = create((set, get) => ({
     setExploredEdges: (edges) => set({ exploredEdges: edges }),
 
     // ── UI State ──────────────────────────────────────────────────────────
-    showLabels: true,
+    showLabels: false,
     darkMode: true,
     cameraAngle: 'perspective', // 'perspective' | 'top'
     isLoading: false,
     error: null,
+
+    // Hover coordination between panels and the 2D/3D maps
+    hoveredEdgeKey: null, // `${from}-${to}`
+    setHoveredEdgeKey: (k) => set({ hoveredEdgeKey: k || null }),
 
     learningMode: 'intermediate', // 'beginner' | 'intermediate' | 'advanced'
     setLearningMode: (mode) => set({ learningMode: mode }),
@@ -83,7 +94,19 @@ const useStore = create((set, get) => ({
 
     // Modal/overlay coordination (prevents 3D Html labels bleeding through)
     isUiOverlayOpen: false,
-    setUiOverlayOpen: (v) => set({ isUiOverlayOpen: v }),
+    uiOverlayLockCount: 0,
+    setUiOverlayOpen: (v) => set({ isUiOverlayOpen: !!v }),
+    pushUiOverlayLock: () =>
+        set((state) => ({
+            uiOverlayLockCount: (state.uiOverlayLockCount || 0) + 1,
+            isUiOverlayOpen: true,
+        })),
+    popUiOverlayLock: () =>
+        set((state) => {
+            const next = Math.max(0, (state.uiOverlayLockCount || 0) - 1);
+            return { uiOverlayLockCount: next, isUiOverlayOpen: next > 0 };
+        }),
+    clearUiOverlayLocks: () => set({ uiOverlayLockCount: 0, isUiOverlayOpen: false }),
 
     // Timeline playback (Theory / Topography)
     isTimelinePlaying: false,

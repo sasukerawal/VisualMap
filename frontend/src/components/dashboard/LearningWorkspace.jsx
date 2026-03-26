@@ -16,6 +16,7 @@ import useStore from '../../store/useStore';
 import { shallow } from 'zustand/shallow';
 import { NODES } from '../../data/townGraph';
 import { displayNodeName } from '../../data/townGraph';
+import { OfflineTutorOverlay } from '../tutor/OfflineTutorOverlay';
 
 const TABS = ['configuration', 'theory', 'tables'];
 const TAB_LABELS = {
@@ -39,6 +40,8 @@ export function LearningWorkspace() {
         setCurrentStepIndex,
         isTimelinePlaying,
         isTimelinePaused,
+        tutorOpen,
+        setTutorOpen,
     } = useStore(
         (s) => ({
             showLabels: s.showLabels,
@@ -56,31 +59,58 @@ export function LearningWorkspace() {
             setCurrentStepIndex: s.setCurrentStepIndex,
             isTimelinePlaying: s.isTimelinePlaying,
             isTimelinePaused: s.isTimelinePaused,
+            tutorOpen: s.tutorOpen,
+            setTutorOpen: s.setTutorOpen,
         }),
         shallow
     );
 
     useEffect(() => {
         // Ensure overlay flag is cleared if this component remounts.
-        useStore.getState().setUiOverlayOpen(false);
+        useStore.getState().clearUiOverlayLocks();
     }, []);
 
     return (
         <aside style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+            <OfflineTutorOverlay />
 
             {/* Header: Academic Branding & Mode Selector */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(140,170,220,0.14)', background: 'rgba(91,156,246,0.07)', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <div>
                         <h1 style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '-0.2px', color: '#e8ecf8', margin: 0 }}>ALGOSIM: Graph Theory</h1>
-                        <p style={{ fontSize: '9px', color: '#7a8aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', margin: '1px 0 0' }}>Interactive Educational Laboratory</p>
+                        <p style={{ fontSize: '10px', color: '#7a8aaa', fontWeight: 650, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '1px 0 0' }}>Interactive Educational Laboratory</p>
                     </div>
                     <div style={{ display: 'flex', gap: 5 }}>
-                        <button className="btn btn-ghost btn-icon" title={showLabels ? 'Hide Labels' : 'Show Labels'} onClick={() => setShowLabels(!showLabels)} style={{ fontSize: '13px' }}>
-                            {showLabels ? '🏷️' : '🔇'}
+                        <button
+                            className="btn btn-ghost btn-icon"
+                            title="AI Tutor"
+                            onClick={() => setTutorOpen(!tutorOpen)}
+                            style={{ fontSize: '13px' }}
+                        >
+                            Tutor
                         </button>
-                        <button className="btn btn-ghost btn-icon" title="Toggle Camera" onClick={() => setCameraAngle(cameraAngle === 'perspective' ? 'top' : 'perspective')} style={{ fontSize: '13px' }}>
-                            {cameraAngle === 'perspective' ? '📐' : '🔭'}
+                        <button className="btn btn-ghost btn-icon" title={showLabels ? 'Hide Labels' : 'Show Labels'} onClick={() => setShowLabels(!showLabels)} aria-label={showLabels ? 'Hide labels' : 'Show labels'}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 1 1 0 6H7a3 3 0 0 1-3-3Z" stroke="currentColor" strokeWidth="2" />
+                                <path d="M7 6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                {!showLabels && <path d="M4 20 20 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}
+                            </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-icon" title={cameraAngle === 'perspective' ? 'Switch to top-down' : 'Switch to perspective'} onClick={() => setCameraAngle(cameraAngle === 'perspective' ? 'top' : 'perspective')} aria-label="Toggle camera">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                {cameraAngle === 'perspective' ? (
+                                    <>
+                                        <path d="M12 3 3.5 7.5 12 12l8.5-4.5L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                        <path d="M3.5 7.5V16.5L12 21l8.5-4.5V7.5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <path d="M4 8.5 12 4l8 4.5-8 4.5-8-4.5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                        <path d="M4 15.5 12 11l8 4.5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                    </>
+                                )}
+                            </svg>
                         </button>
                     </div>
                 </div>
@@ -132,7 +162,7 @@ export function LearningWorkspace() {
 
                     {/* Top Half: State Space Explorer (resizable) */}
                     <Panel defaultSize={40} minSize={25} style={{ overflow: 'hidden' }}>
-                        <div style={{ height: '100%', padding: '12px 14px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ height: '100%', padding: '12px 14px', overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                             <StateSpaceExplorer />
                         </div>
                     </Panel>
@@ -197,18 +227,42 @@ export function LearningWorkspace() {
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -10 }}
                                         transition={{ duration: 0.15, ease: "easeOut" }}
-                                        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: activeTab === 'theory' ? 0 : 12, minHeight: 0, overflow: 'hidden' }}
+                                        style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: activeTab === 'theory' ? 0 : 12,
+                                            minHeight: 0,
+                                            overflowX: 'hidden',
+                                            overflowY: activeTab === 'theory' ? 'hidden' : 'auto',
+                                            paddingRight: activeTab === 'theory' ? 0 : 4,
+                                        }}
                                     >
                                         {activeTab === 'configuration' && (
                                             <>
                                                 <AlgoSelector />
                                                 {destinations.length < 2 && !routeResult ? (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 10, textAlign: 'center', color: 'var(--text-secondary)', padding: '16px' }}>
-                                                        <div style={{ fontSize: '28px', opacity: 0.7 }}>🏠</div>
-                                                        <p style={{ margin: 0, fontSize: '11px', lineHeight: 1.6, color: '#8892b0' }}>Define the problem by selecting at least 2 locations on the map.</p>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12, textAlign: 'center', color: 'var(--text-secondary)', padding: '16px' }}>
+                                                        <div style={{ width: 42, height: 42, borderRadius: 14, display: 'grid', placeItems: 'center', border: '1px solid rgba(99,120,255,0.22)', background: 'rgba(99,120,255,0.10)', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ color: '#a9bbff' }}>
+                                                                <path d="M3 11 12 4l9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                                                <path d="M9 22v-8h6v8" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                                            </svg>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 360 }}>
+                                                            <div style={{ fontSize: '12px', fontWeight: 900, color: '#e8ecf8', letterSpacing: '-0.2px' }}>Quick Start</div>
+                                                            <div style={{ fontSize: '11px', lineHeight: 1.6, color: '#8f9bb3' }}>
+                                                                1) Pick an algorithm • 2) Tap 2+ houses • 3) Start navigation
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', lineHeight: 1.6, color: '#8892b0' }}>
+                                                                Tip: keep labels off for a cleaner map, then enable them when you need names.
+                                                            </div>
+                                                        </div>
+
                                                         <button
                                                             className="btn btn-primary"
-                                                            style={{ marginTop: 4, padding: '8px 16px', fontSize: '11px', fontWeight: 600, background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,120,255,0.2)' }}
+                                                            style={{ marginTop: 4, padding: '8px 16px', fontSize: '11px', fontWeight: 700, background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,120,255,0.2)' }}
                                                             onClick={() => {
                                                                 const arr = Object.keys(NODES).filter(k => NODES[k].type === 'address');
                                                                 const r1 = arr[Math.floor(Math.random() * arr.length)];
@@ -218,7 +272,7 @@ export function LearningWorkspace() {
                                                                 useStore.getState().addDestination(r2);
                                                             }}
                                                         >
-                                                            🎲 Initialize Random Stops
+                                                            Initialize Random Stops
                                                         </button>
                                                     </div>
                                                 ) : (
@@ -258,7 +312,7 @@ export function LearningWorkspace() {
                                                             className="btn btn-ghost"
                                                             onClick={() => {
                                                                 setTheoryOpen(true);
-                                                                useStore.getState().setUiOverlayOpen(true);
+                                                                useStore.getState().pushUiOverlayLock();
                                                             }}
                                                             style={{ borderRadius: 14, padding: '10px 14px', fontWeight: 800 }}
                                                         >
@@ -354,7 +408,7 @@ export function LearningWorkspace() {
                                                                     className="btn btn-danger"
                                                                     onClick={() => {
                                                                         setTheoryOpen(false);
-                                                                        useStore.getState().setUiOverlayOpen(false);
+                                                                        useStore.getState().popUiOverlayLock();
                                                                     }}
                                                                     style={{ borderRadius: 14, padding: '10px 14px', fontWeight: 900 }}
                                                                 >

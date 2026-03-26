@@ -164,7 +164,7 @@ function SceneOverlays() {
                     }}
                 >
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#b3c7ff' }}>
-                        Route computed — {routeResult.total_distance.toFixed(1)} units
+                        Route computed - {routeResult.total_distance.toFixed(1)} units
                     </span>
                 </GlassBadge>
             )}
@@ -186,7 +186,7 @@ function SceneOverlays() {
             >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: '#eef2ff', letterSpacing: '0.08em' }}>LEGEND</span>
-                    <span style={{ fontSize: 12, color: '#90a4c3' }}>⌄</span>
+                    <span style={{ fontSize: 12, color: '#90a4c3' }}>v</span>
                 </div>
                 <LegendItem color="#16202e" label="Road" />
                 <LegendItem color="#00ff85" label="Optimal Path" glow />
@@ -194,7 +194,7 @@ function SceneOverlays() {
                 <LegendItem color="#00d4ff" label="Selected Stop" glow />
                 <LegendItem color="#ffd700" label="Warehouse" glow />
                 <div style={{ height: 1, background: 'rgba(99,120,255,0.12)', margin: '6px 0 4px' }} />
-                <p style={{ fontSize: 10, color: '#667a97', margin: 0, lineHeight: 1.4 }}>Drag to orbit · Scroll to zoom</p>
+                <p style={{ fontSize: 10, color: '#667a97', margin: 0, lineHeight: 1.4 }}>Drag to orbit - Scroll to zoom</p>
             </GlassBadge>
 
             {!isPlaying && destinations.length === 0 && (
@@ -223,9 +223,9 @@ export default function App() {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#070a12' }}>
             <div style={{ flex: 1, overflow: 'hidden' }}>
-                <Group direction="horizontal">
+                <Group direction="horizontal" className="vm-root-panels">
                     <Panel defaultSize={60} minSize={30}>
-                        <div style={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
+                        <div className="vm-scene-shell" style={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
                             <ErrorBoundary>
                                 <SceneOverlays />
                                 <Suspense fallback={<LoadingScreen />}>
@@ -239,6 +239,7 @@ export default function App() {
 
                     <Panel defaultSize={40} minSize={25}>
                         <div
+                            className="vm-dashboard-shell"
                             style={{
                                 height: '100%',
                                 position: 'relative',
